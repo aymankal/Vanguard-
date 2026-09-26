@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Vanguard CRM</title>
+<meta name="theme-color" content="#0a1120" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#f4f6fa" media="(prefers-color-scheme: light)" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Vanguard CRM" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="icon" href="/static/logo.png" type="image/png" />
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" />
+<link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="brand-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f6bff" /><stop offset="1" stop-color="#14c9a8" />
+    </linearGradient>
+  </defs>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" /></symbol>
+  <symbol id="i-today" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="m8 12.5 2.7 2.7L16.5 9" /></symbol>
+  <symbol id="i-notes" viewBox="0 0 24 24"><path d="M5 3h10l4 4v14H5z" /><path d="M15 3v4h4M8 12h8M8 16h6" /></symbol>
+  <symbol id="i-pipeline" viewBox="0 0 24 24"><rect x="3" y="4" width="5" height="16" rx="1.5" /><rect x="10" y="4" width="5" height="11" rx="1.5" /><rect x="17" y="4" width="4" height="7" rx="1.5" /></symbol>
+  <symbol id="i-contacts" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5" /><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2" /></symbol>
+  <symbol id="i-companies" viewBox="0 0 24 24"><path d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16M15 9h4a1 1 0 0 1 1 1v11M2 21h20" /><path d="M8 8h3M8 12h3M8 16h3" /></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3c.6 4.4 2.6 6.4 7 7-4.4.6-6.4 2.6-7 7-.6-4.4-2.6-6.4-7-7 4.4-.6 6.4-2.6 7-7z" /><path d="M19 15.5c.3 1.7 1 2.5 2.5 2.8-1.6.3-2.2 1.1-2.5 2.7-.3-1.6-1-2.4-2.5-2.7 1.5-.3 2.2-1.1 2.5-2.8z" /></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12 20 4l-6 16-2.5-6.5z" /><path d="M11.5 13.5 20 4" /></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></symbol>
+  <symbol id="i-theme" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor" /></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></symbol>
+  <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.6" /><path d="M4 4v4.6h4.6" /></symbol>
+</svg>
+
+<a class="skip-link" href="#content">Skip to content</a>
+<div class="loading-bar" aria-hidden="true"></div>
+<div class="app">
+  <aside class="sidebar">
+    <a class="brand" href="#/" aria-label="Vanguard CRM home">
+      <img src="/static/logo.png" alt="" class="logo" />
+      <span class="brand-name">Vanguard<span class="brand-sub">Services CRM</span></span>
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a class="nav-item" href="#/" data-view="dashboard"><svg class="ni" aria-hidden="true"><use href="#i-home" /></svg><span class="nl">Home</span></a>
+      <a class="nav-item" href="#/tasks" data-view="tasks"><svg class="ni" aria-hidden="true"><use href="#i-today" /></svg><span class="nl">Today<span class="nl-long"> &amp; tasks</span></span><span class="count" id="c-tasks"></span></a>
+      <a class="nav-item" href="#/notes" data-view="notes"><svg class="ni" aria-hidden="true"><use href="#i-notes" /></svg><span class="nl">Notes</span><span class="count" id="c-notes"></span></a>
+      <a class="nav-item" href="#/pipeline" data-view="pipeline"><svg class="ni" aria-hidden="true"><use href="#i-pipeline" /></svg><span class="nl">Pipeline</span><span class="count" id="c-deals"></span></a>
+      <a class="nav-item" href="#/contacts" data-view="contacts"><svg class="ni" aria-hidden="true"><use href="#i-contacts" /></svg><span class="nl">Contacts</span><span class="count" id="c-contacts"></span></a>
+      <a class="nav-item" href="#/companies" data-view="companies"><svg class="ni" aria-hidden="true"><use href="#i-companies" /></svg><span class="nl">Companies</span><span class="count" id="c-companies"></span></a>
+    </nav>
+    <button class="copilot-cta" type="button" data-copilot-open>
+      <svg aria-hidden="true"><use href="#i-spark" /></svg>
+      <span><strong>Ask Copilot</strong><small>Plan, brief, update — <kbd>⌘J</kbd></small></span>
+    </button>
+    <div class="sidebar-foot">
+      <div class="shortcuts"><kbd>⌘K</kbd> search · <kbd>N</kbd> note · <kbd>L</kbd> log · <kbd>?</kbd> help</div>
+      <button class="btn ghost sm" id="theme-toggle" type="button" title="Switch theme">◐ System</button>
+      <div class="copyright">&copy; Vanguard Services S.A.L 2026</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <h1 id="view-title">Home</h1>
+      <button class="search" id="search" type="button" aria-label="Search or run a command">
+        <svg aria-hidden="true"><use href="#i-search" /></svg><span>Search or jump to…</span><kbd>⌘K</kbd>
+      </button>
+      <div class="spacer"></div>
+      <div id="top-actions" class="row"></div>
+      <button class="copilot-btn" type="button" data-copilot-open aria-label="Open Copilot">
+        <svg aria-hidden="true"><use href="#i-spark" /></svg><span>Copilot</span>
+      </button>
+    </header>
+    <section class="content" id="content" tabindex="-1"><div class="empty">Loading…</div></section>
+    <footer class="app-footer">&copy; Vanguard Services S.A.L 2026</footer>
+  </main>
+
+  <aside class="copilot" id="copilot" aria-label="Copilot" hidden>
+    <header class="cp-head">
+      <span class="cp-mark" aria-hidden="true"><svg><use href="#i-spark" /></svg></span>
+      <div class="cp-title"><strong>Copilot</strong><small id="cp-mode">Your CRM assistant</small></div>
+      <button class="cp-icon" type="button" id="cp-reset" title="New conversation" aria-label="New conversation"><svg><use href="#i-reset" /></svg></button>
+      <button class="cp-icon" type="button" id="cp-close" title="Close (Esc)" aria-label="Close Copilot"><svg><use href="#i-close" /></svg></button>
+    </header>
+    <div class="cp-context" id="cp-context"></div>
+    <div class="cp-log" id="cp-log" role="log" aria-live="polite"></div>
+    <div class="cp-suggest" id="cp-suggest"></div>
+    <form class="cp-form" id="cp-form">
+      <textarea id="cp-input" rows="1" placeholder="Ask or tell Copilot… e.g. “remind me to call Dana Friday”" aria-label="Message Copilot"></textarea>
+      <button type="submit" class="cp-send" aria-label="Send"><svg><use href="#i-send" /></svg></button>
+    </form>
+  </aside>
+</div>
+<button class="copilot-fab" type="button" data-copilot-open aria-label="Open Copilot"><svg aria-hidden="true"><use href="#i-spark" /></svg></button>
+<div id="modal-root"></div>
+<div id="toasts"></div>
+<script src="/static/app.js"></script>
+<script src="/static/copilot.js"></script>
+</body>
+</html>

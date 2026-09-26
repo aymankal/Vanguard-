@@ -1,0 +1,6 @@
+*.db
+*.pyc
+.pytest_cache/
+__pycache__/
+crm.db
+demo/dist/
