@@ -1,90 +1,100 @@
-# Vanguard CRM
+# Vanguard Docs
 
 <img src="web/logo.png" alt="Vanguard" width="72" />
 
-The CRM for Vanguard Services: pipeline, accounts, meeting notes and an AI **Copilot** that
-plans your day, briefs you before calls and updates records when you ask.
+Document control for Vanguard Services, built as an app you install on your phone. It holds
+contracts, licences, HR files and filings, with expiry tracking and a restricted **Case File**.
 
-## What's inside
+There is no server to run. The app is a static site, and **Supabase** provides sign-in, the database
+and file storage. Every permission is enforced inside the database with row-level security, so
+the public key in `web/config.js` can't read anything on its own.
 
-**Copilot (AI assistant)** — open it from any page (sidebar, top bar, the Home ask box, `⌘/Ctrl+J`,
-or the floating button on phones). It knows which record you're looking at, so "brief me on this
-deal" or "log a call: left voicemail" just work.
+## What it does
 
-| Ask | Copilot does |
-| --- | --- |
-| "What should I focus on today?" | Overdue tasks, follow-ups due, deals going cold, at-risk accounts |
-| "Brief me on Northwind" | Health, contract, renewal, people, open deals, last meeting, next best action |
-| "Remind me to send Dana pricing tomorrow, urgent" | Creates a high-priority task due tomorrow, linked to Dana |
-| "Log a call with Marcus: pilot scope agreed" | Adds the call to the timeline, updates last touch |
-| "Move the Ferro deal to negotiation" | Moves the deal (records the stage change) |
-| "Follow up with Priya on Friday" | Sets the contact's next follow-up |
-| "Draft a follow-up email to Tomás" | Client-ready draft with a copy button |
-| "Pipeline", "deals going cold", "accounts at risk", "what's overdue" | Instant reports with links |
+- **Modules** such as Client Contracts (CON) or HR (HR). Each document gets a permanent
+  reference number from its module code, for example `VG-CON-0007`. The database issues the
+  numbers and never reuses one, even after a delete or a move.
+- **Register** with search, a status filter and sorting. On a phone it shows as cards. The
+  *Expiring in 30 days* and *Missing file* views list what needs attention.
+- **Files** up to 25 MB each: PDF, photos, Word, Excel, PowerPoint, CSV and text. They're kept in
+  a private bucket and opened through links that expire after 5 minutes. You can open, download
+  or share a file (share sends it to WhatsApp, Mail and similar apps).
+- **Team** with one account per person:
+  - **Owner:** everything, plus the Team screen and the Case File.
+  - **Editor:** adds and changes records.
+  - **Viewer:** read-only.
+  - **Pending:** new sign-ups see nothing until an owner approves them.
+- **Case File:** owners only, and only after entering a separate Case File passcode. The
+  passcode is stored hashed. 8 wrong tries locks it for 15 minutes, and unlocking lasts 8 hours.
+  While it's locked, Case File records and files can't be read in any way.
+- **Export and import** the register as JSON from the More menu. Import also accepts the
+  claude.ai version's data.
 
-Every change shows as a green action card linking to the record, and the page refreshes.
+## Set up
 
-- **With `ANTHROPIC_API_KEY`**: Claude (`claude-opus-5` by default, `CRM_AI_MODEL` to change) runs
-  with CRM tools — search, look up contacts/companies/deals, agenda, pipeline, create tasks, log
-  activities, set follow-ups, move deals, save notes. It never deletes anything.
-- **Without a key**: a built-in assistant handles the requests above, so demos never break.
+### 1. Database (once)
 
-**CRM** — dashboard with a daily briefing, weighted pipeline, win rate, forecast, renewals and
-at-risk accounts; contacts (filters, bulk actions, CSV import from Apollo/HubSpot/LinkedIn,
-duplicate warnings); companies with contract value, renewal date and relationship health;
-drag-and-drop pipeline; click-to-edit fields; activity timelines; tasks with priorities and due
-dates; Undo instead of "are you sure?" dialogs.
+The database lives in the Supabase project `vanguard-docs` (Frankfurt).
 
-**Note taker** — templates (discovery, SDR scoping, QBR, cold call, internal), meeting timer,
-timestamps, dictation, `[ ] Send deck @fri !high` checklists that become tasks, one-click
-summaries (decisions, risks, action items, next step) and client recap emails.
+1. Open the project's SQL editor and run
+   `supabase/migrations/20261005180000_document_control.sql`. You can also use
+   `supabase db push` with the Supabase CLI.
+2. In **Authentication → URL Configuration**, set **Site URL** to the app's address, for example
+   `https://vanguard-docs.onrender.com`. Confirmation and password-reset emails link there.
 
-**Everywhere** — `⌘K` command bar, light and dark themes, installable on Android/iPhone,
-sign-in page with 30-day sessions, © Vanguard Services S.A.L 2026.
+### 2. Hosting (free)
 
-## Deploy on Render (5 minutes)
+In Render, choose **New → Blueprint**, pick this repository and click **Apply**. `render.yaml`
+publishes `web/` as a free static site with the security headers already set.
 
-1. Render → **New → Blueprint** → pick this repository → **Apply**. Everything (build and start
-   commands, disk, region, password) comes from `render.yaml`; nothing to type.
-2. Plan: Starter + 1 GB disk (~$7.25/month) so data survives restarts. Set `CRM_SEED_DEMO` to
-   `false` before the first deploy to start with an empty CRM.
-3. When it's live, open the service → **Environment** → copy `CRM_PASSWORD`. Sign in with
-   username `vanguard`.
-4. Optional: add `ANTHROPIC_API_KEY` in Environment to switch Copilot to Claude.
-5. On your phone: open the URL in Chrome → sign in → tap **Install** on the Home card.
+Any static host works: Netlify, Vercel, Cloudflare Pages or GitHub Pages. Publish the `web/`
+folder, then update the Supabase address in the `Content-Security-Policy` header if you change projects.
 
-Other hosts: `Dockerfile` works anywhere Docker runs; any Python host works with
-`pip install -r requirements.txt` and `sh start.sh`.
+### 3. Your account
 
-## Configuration
+1. Open the app and choose **Create an account**. Confirm your email, then sign in. **The first
+   account becomes the owner**, so do this before you share the link.
+2. Open the **Case File** and set its passcode.
+3. Teammates create their own accounts, then appear under **More → Team** as *pending*. Give
+   each one a role.
+4. Once your team is in, you can turn off **Allow new users to sign up** under Authentication →
+   Providers. Strangers who sign up see nothing anyway, but this stops the sign-ups entirely.
 
-| Variable | Purpose |
-| --- | --- |
-| `CRM_PASSWORD` | Turns on sign-in. On Render without it, a temporary password is printed in the logs (and changes on restart). |
-| `CRM_USERNAME` | Sign-in username, not case-sensitive (default `vanguard`). |
-| `CRM_DB_PATH` | SQLite file (default `crm.db`). Point it at a persistent disk in production. |
-| `CRM_SEED_DEMO` | `false` skips sample data on first boot. |
-| `ANTHROPIC_API_KEY` | Powers Copilot, note summaries and recaps with Claude. |
-| `CRM_AI_MODEL` | Claude model (default `claude-opus-5`). |
-| `CRM_AI_DISABLED` | Force the built-in (offline) assistant. |
+### 4. Install on your phone
+
+- **iPhone:** open the app in Safari, then tap Share → **Add to Home Screen**.
+- **Android:** open it in Chrome, then tap ⋮ → **Install app** (or More → Install app inside the app).
+
+## Moving over from the claude.ai version
+
+1. Get a JSON export of the old register.
+2. Unlock the Case File first if the export contains Case File records.
+3. Choose **More → Import register…** and pick the file. Reference numbers carry over, and
+   importing twice adds nothing.
+4. Re-attach files. The **Missing file** view lists every record that still needs one.
+
+## Costs
+
+The Supabase free plan includes 1 GB of files and 500 MB of database. A free project pauses after
+a week with no activity. For real use, Supabase Pro ($25/month) gives 100 GB of files, daily
+backups and no pausing. Static hosting on Render is free.
 
 ## Run locally
 
 ```bash
-pip install -r requirements.txt
-python seed.py                      # optional sample data
-python -m uvicorn crm.main:app --reload
+cd web && python3 -m http.server 8000
 ```
 
-Open http://localhost:8000. Tests: `pip install -r requirements-dev.txt && python -m pytest tests`.
+Open http://localhost:8000. It runs against the Supabase project in `web/config.js`. Add
+`http://localhost:8000` to the redirect URLs in Supabase if you test email links locally.
 
 ## Layout
 
 ```
-crm/        FastAPI backend: main.py (API), assistant.py (Copilot), notetaker.py, auth.py, db.py
-web/        Frontend: index.html, styles.css (design system), app.js, copilot.js, PWA files
-tests/      API and Copilot tests
-seed.py     Sample data
+supabase/migrations/   Database schema, row-level security, Case File functions, storage bucket
+web/                   The app: index.html, styles.css, app.js, config.js, PWA files, icons
+web/vendor/            supabase-js 2.117.2 (bundled so the app shell opens offline)
+render.yaml            Free static hosting with security headers
 ```
 
 ---

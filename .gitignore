@@ -1,6 +1,4 @@
-*.db
-*.pyc
-.pytest_cache/
+.DS_Store
+node_modules/
 __pycache__/
-crm.db
-demo/dist/
+*.pyc
