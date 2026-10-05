@@ -1,8 +1,10 @@
-"""Sign-in for the CRM: a login page with a signed 30-day session cookie.
+"""Sign-in for Vanguard Docs, plus the second lock on the Case File.
 
-Enabled whenever CRM_PASSWORD is set. HTTP Basic credentials are still accepted for
-scripts, but browsers never get the native Basic-auth pop-up (it is unusable on phones
-and inside installed apps).
+- APP_PASSWORD turns on the login page (signed 30-day session cookie). HTTP Basic is still
+  accepted for scripts; browsers never get the native Basic pop-up (unusable in installed apps).
+- CASE_PASSWORD is a separate passcode for the Case File. Unlocking it sets a second signed
+  cookie that lasts CASE_HOURS. Without CASE_PASSWORD the Case File is switched off entirely,
+  so restricted records are never readable with the shared login alone.
 """
 
 import base64
@@ -16,8 +18,10 @@ from collections import defaultdict, deque
 from typing import Optional
 from urllib.parse import parse_qs
 
-COOKIE = "vcrm_session"
+COOKIE = "vg_session"
+CASE_COOKIE = "vg_case"
 SESSION_DAYS = 30
+CASE_HOURS = 8
 MAX_FAILURES = 8
 FAILURE_WINDOW = 15 * 60
 PUBLIC_PATHS = {"/healthz", "/manifest.webmanifest", "/sw.js", "/login", "/logout"}
@@ -27,45 +31,65 @@ _failures: dict[str, deque] = defaultdict(deque)
 
 
 def enabled() -> bool:
-    return bool(os.environ.get("CRM_PASSWORD", "").strip())
+    return bool(os.environ.get("APP_PASSWORD", "").strip())
+
+
+def case_enabled() -> bool:
+    return bool(os.environ.get("CASE_PASSWORD", "").strip())
 
 
 def expected() -> tuple[str, str]:
-    username = (os.environ.get("CRM_USERNAME") or "vanguard").strip()
-    return username, os.environ.get("CRM_PASSWORD", "").strip()
+    username = (os.environ.get("APP_USERNAME") or "vanguard").strip()
+    return username, os.environ.get("APP_PASSWORD", "").strip()
 
 
 def check_credentials(username: str, password: str) -> bool:
     """Username ignores case and surrounding spaces (phone keyboards capitalise it)."""
     want_user, want_pass = expected()
-    given = username.strip().lower().encode()
-    # Without CRM_USERNAME, "admin" (the earlier default, printed in old logs) also works.
-    allowed = [want_user.lower()] + ([] if os.environ.get("CRM_USERNAME", "").strip() else ["admin"])
-    user_ok = any(secrets.compare_digest(given, a.encode()) for a in allowed)
+    user_ok = secrets.compare_digest(username.strip().lower().encode(), want_user.lower().encode())
     pass_ok = secrets.compare_digest(password.strip().encode(), want_pass.encode())
     return user_ok and pass_ok
+
+
+def check_case_password(password: str) -> bool:
+    want = os.environ.get("CASE_PASSWORD", "").strip()
+    return bool(want) and secrets.compare_digest(password.strip().encode(), want.encode())
+
+
+# ------------------------------------------------------------- tokens
+def _sign(key: bytes, seconds: int) -> str:
+    payload = str(int(time.time()) + seconds)
+    return f"{payload}.{hmac.new(key, payload.encode(), hashlib.sha256).hexdigest()}"
+
+
+def _verify(key: bytes, token: Optional[str]) -> bool:
+    if not token or "." not in token:
+        return False
+    payload, sig = token.rsplit(".", 1)
+    good = hmac.new(key, payload.encode(), hashlib.sha256).hexdigest()
+    return secrets.compare_digest(sig, good) and payload.isdigit() and int(payload) > time.time()
 
 
 def _key() -> bytes:
     # Derived from the credentials, so changing the password signs everyone out.
     user, password = expected()
-    return hashlib.sha256(f"vcrm-session|{user.lower()}|{password}".encode()).digest()
+    return hashlib.sha256(f"vg-session|{user.lower()}|{password}".encode()).digest()
+
+
+def _case_key() -> bytes:
+    return hashlib.sha256(f"vg-case|{os.environ.get('CASE_PASSWORD', '').strip()}".encode()).digest()
 
 
 def make_session() -> str:
-    payload = str(int(time.time()) + SESSION_DAYS * 86400)
-    sig = hmac.new(_key(), payload.encode(), hashlib.sha256).hexdigest()
-    return f"{payload}.{sig}"
+    return _sign(_key(), SESSION_DAYS * 86400)
+
+
+def make_case_session() -> str:
+    return _sign(_case_key(), CASE_HOURS * 3600)
 
 
 def valid_session(token: Optional[str]) -> bool:
-    if not token or "." not in token:
-        return False
-    payload, sig = token.rsplit(".", 1)
-    good = hmac.new(_key(), payload.encode(), hashlib.sha256).hexdigest()
-    if not secrets.compare_digest(sig, good):
-        return False
-    return payload.isdigit() and int(payload) > time.time()
+    return _verify(_key(), token)
 
 
 def valid_basic(header: str) -> bool:
@@ -84,6 +108,10 @@ def is_public(path: str) -> bool:
 
 def authorized(request) -> bool:
     return valid_session(request.cookies.get(COOKIE)) or valid_basic(request.headers.get("authorization", ""))
+
+
+def case_unlocked(request) -> bool:
+    return case_enabled() and _verify(_case_key(), request.cookies.get(CASE_COOKIE))
 
 
 # ------------------------------------------------------------ throttling
@@ -117,6 +145,26 @@ def safe_next(target: str) -> str:
     return target if target.startswith("#/") else "#/"
 
 
+def cookie_header(name: str, value: str, secure: bool, max_age: int) -> str:
+    parts = [f"{name}={value}", "Path=/", "HttpOnly", "SameSite=Strict" if name == CASE_COOKIE else "SameSite=Lax",
+             f"Max-Age={max_age}"]
+    if secure:
+        parts.append("Secure")
+    return "; ".join(parts)
+
+
+FAILED = "Wrong username or password."
+ADMIN_HINT = (
+    "Admin: the login is APP_USERNAME and APP_PASSWORD under Environment in Render. "
+    "No password set? A temporary one is printed in the service logs."
+)
+
+
+def locked_message(seconds: int) -> str:
+    minutes = max(1, round(seconds / 60))
+    return f"Too many attempts from this device. Try again in {minutes} minute{'s' if minutes > 1 else ''}."
+
+
 # ------------------------------------------------------------- the page
 def login_page(error: str = "", username: str = "", next_hash: str = "#/") -> str:
     err = f'<p class="error" role="alert">{html.escape(error)}</p>' if error else ""
@@ -126,39 +174,39 @@ def login_page(error: str = "", username: str = "", next_hash: str = "#/") -> st
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Sign in · Vanguard Services CRM</title>
-<meta name="theme-color" content="#0f1115" />
+<title>Sign in · Vanguard Docs</title>
+<meta name="theme-color" content="#121715" />
 <link rel="manifest" href="/manifest.webmanifest" />
 <link rel="icon" href="/static/logo.png" type="image/png" />
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png" />
 <style>
   :root {{
-    --bg: #0f1115; --panel: #171a21; --panel-2: #1d212a; --line: #272c37; --text: #e6e9ef;
-    --muted: #8b93a7; --accent: #6c8cff; --danger: #ff6b6b; color-scheme: dark;
+    --bg: #121715; --panel: #1a201d; --sunk: #222a26; --line: #303a35; --text: #e6ebe8;
+    --muted: #97a39c; --accent: #6aa8de; --accent-fg: #0b1520; --danger: #ec8576; color-scheme: dark;
   }}
   @media (prefers-color-scheme: light) {{
-    :root {{ --bg: #f5f6f9; --panel: #fff; --panel-2: #f1f3f7; --line: #e1e4ea; --text: #1b1f27;
-      --muted: #626b7f; --accent: #3f63f0; --danger: #d63b3b; color-scheme: light; }}
+    :root {{ --bg: #f3f4f2; --panel: #fff; --sunk: #e9ebe7; --line: #d7dbd4; --text: #16201c;
+      --muted: #5d6862; --accent: #165d96; --accent-fg: #fff; --danger: #b03a2e; color-scheme: light; }}
   }}
   * {{ box-sizing: border-box; }}
   html, body {{ height: 100%; }}
   body {{
     margin: 0; background: var(--bg); color: var(--text);
-    font: 15px/1.5 "Inter", "Segoe UI", system-ui, sans-serif;
+    font: 15px/1.5 "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     padding: max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
   }}
   main {{ width: 100%; max-width: 380px; }}
   .brand {{ display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }}
   .brand img {{ width: 44px; height: 44px; }}
-  .brand strong {{ display: block; font-size: 18px; }}
+  .brand strong {{ display: block; font-size: 18px; letter-spacing: .04em; }}
   .brand span {{ font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }}
-  form {{ background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px; display: grid; gap: 14px; }}
+  form {{ background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 22px; display: grid; gap: 14px; }}
   h1 {{ font-size: 20px; margin: 0; }}
   label {{ display: grid; gap: 6px; font-size: 13px; color: var(--muted); }}
   input {{
-    font: inherit; font-size: 16px; color: var(--text); background: var(--panel-2);
-    border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; width: 100%;
+    font: inherit; font-size: 16px; color: var(--text); background: var(--sunk);
+    border: 1px solid var(--line); border-radius: 6px; padding: 11px 12px; width: 100%;
   }}
   input:focus {{ outline: none; border-color: var(--accent); }}
   .pw {{ position: relative; }}
@@ -168,8 +216,8 @@ def login_page(error: str = "", username: str = "", next_hash: str = "#/") -> st
     color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; padding: 6px 8px; cursor: pointer;
   }}
   .submit {{
-    font: inherit; font-weight: 700; color: #fff; background: var(--accent); border: none;
-    border-radius: 10px; padding: 12px; cursor: pointer;
+    font: inherit; font-weight: 700; color: var(--accent-fg); background: var(--accent); border: none;
+    border-radius: 6px; padding: 12px; cursor: pointer;
   }}
   .submit:focus-visible, .pw button:focus-visible {{ outline: 2px solid var(--accent); outline-offset: 2px; }}
   .error {{ margin: 0; color: var(--danger); font-size: 14px; }}
@@ -181,7 +229,7 @@ def login_page(error: str = "", username: str = "", next_hash: str = "#/") -> st
 <main>
   <div class="brand">
     <img src="/static/logo.png" alt="" />
-    <div><strong>Vanguard Services</strong><span>CRM</span></div>
+    <div><strong>VANGUARD</strong><span>Document control</span></div>
   </div>
   <form method="post" action="/login" novalidate>
     <h1>Sign in</h1>
@@ -216,22 +264,3 @@ def login_page(error: str = "", username: str = "", next_hash: str = "#/") -> st
 </script>
 </body>
 </html>"""
-
-
-FAILED = "Wrong username or password."
-ADMIN_HINT = (
-    "Admin: the login is CRM_USERNAME and CRM_PASSWORD under Environment in Render. "
-    "No password set? A temporary one is printed in the service logs."
-)
-
-
-def locked_message(seconds: int) -> str:
-    minutes = max(1, round(seconds / 60))
-    return f"Too many attempts from this device. Try again in {minutes} minute{'s' if minutes > 1 else ''}."
-
-
-def cookie_header(value: str, secure: bool, max_age: int) -> str:
-    parts = [f"{COOKIE}={value}", "Path=/", "HttpOnly", "SameSite=Lax", f"Max-Age={max_age}"]
-    if secure:
-        parts.append("Secure")
-    return "; ".join(parts)

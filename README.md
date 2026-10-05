@@ -1,90 +1,76 @@
-# Vanguard CRM
+# Vanguard Docs
 
 <img src="web/logo.png" alt="Vanguard" width="72" />
 
-The CRM for Vanguard Services: pipeline, accounts, meeting notes and an AI **Copilot** that
-plans your day, briefs you before calls and updates records when you ask.
+Document control for Vanguard Services, built as an app you install on your phone. It holds
+contracts, licences, HR files and filings, with expiry tracking and a restricted **Case File**.
 
-## What's inside
+## What it does
 
-**Copilot (AI assistant)** — open it from any page (sidebar, top bar, the Home ask box, `⌘/Ctrl+J`,
-or the floating button on phones). It knows which record you're looking at, so "brief me on this
-deal" or "log a call: left voicemail" just work.
-
-| Ask | Copilot does |
-| --- | --- |
-| "What should I focus on today?" | Overdue tasks, follow-ups due, deals going cold, at-risk accounts |
-| "Brief me on Northwind" | Health, contract, renewal, people, open deals, last meeting, next best action |
-| "Remind me to send Dana pricing tomorrow, urgent" | Creates a high-priority task due tomorrow, linked to Dana |
-| "Log a call with Marcus: pilot scope agreed" | Adds the call to the timeline, updates last touch |
-| "Move the Ferro deal to negotiation" | Moves the deal (records the stage change) |
-| "Follow up with Priya on Friday" | Sets the contact's next follow-up |
-| "Draft a follow-up email to Tomás" | Client-ready draft with a copy button |
-| "Pipeline", "deals going cold", "accounts at risk", "what's overdue" | Instant reports with links |
-
-Every change shows as a green action card linking to the record, and the page refreshes.
-
-- **With `ANTHROPIC_API_KEY`**: Claude (`claude-opus-5` by default, `CRM_AI_MODEL` to change) runs
-  with CRM tools — search, look up contacts/companies/deals, agenda, pipeline, create tasks, log
-  activities, set follow-ups, move deals, save notes. It never deletes anything.
-- **Without a key**: a built-in assistant handles the requests above, so demos never break.
-
-**CRM** — dashboard with a daily briefing, weighted pipeline, win rate, forecast, renewals and
-at-risk accounts; contacts (filters, bulk actions, CSV import from Apollo/HubSpot/LinkedIn,
-duplicate warnings); companies with contract value, renewal date and relationship health;
-drag-and-drop pipeline; click-to-edit fields; activity timelines; tasks with priorities and due
-dates; Undo instead of "are you sure?" dialogs.
-
-**Note taker** — templates (discovery, SDR scoping, QBR, cold call, internal), meeting timer,
-timestamps, dictation, `[ ] Send deck @fri !high` checklists that become tasks, one-click
-summaries (decisions, risks, action items, next step) and client recap emails.
-
-**Everywhere** — `⌘K` command bar, light and dark themes, installable on Android/iPhone,
-sign-in page with 30-day sessions, © Vanguard Services S.A.L 2026.
+- **Modules** such as Client Contracts (CON) or HR (HR). Every document gets a permanent
+  reference number from its module code, for example `VG-CON-0007`. A number is never issued twice,
+  even after a delete or a move.
+- **Register** with search, status filter and sorting. On a phone it shows as cards.
+- **Saved views:** *Expiring in 30 days* (renewals and overdue items) and *Missing file*
+  (records with no file and no link).
+- **Files** up to 25 MB each: PDF, photos, Word, Excel, PowerPoint, CSV and text. On a phone you
+  can open, download or share a file (share sends it to WhatsApp, Mail and similar apps).
+- **Case File:** restricted records behind a **second passcode** (`CASE_PASSWORD`), enforced
+  on the server. While the Case File is locked, its records don't show up in search, counts,
+  exports or file links. Unlocking lasts 8 hours on that device. Without `CASE_PASSWORD` the
+  Case File is switched off.
+- **Export and import** the register as JSON from the More menu. Exports are for backups, and
+  import is how you move over from the claude.ai version.
+- Light, dark and system themes. The app shell opens offline.
 
 ## Deploy on Render (5 minutes)
 
-1. Render → **New → Blueprint** → pick this repository → **Apply**. Everything (build and start
-   commands, disk, region, password) comes from `render.yaml`; nothing to type.
-2. Plan: Starter + 1 GB disk (~$7.25/month) so data survives restarts. Set `CRM_SEED_DEMO` to
-   `false` before the first deploy to start with an empty CRM.
-3. When it's live, open the service → **Environment** → copy `CRM_PASSWORD`. Sign in with
-   username `vanguard`.
-4. Optional: add `ANTHROPIC_API_KEY` in Environment to switch Copilot to Claude.
-5. On your phone: open the URL in Chrome → sign in → tap **Install** on the Home card.
+1. In Render, choose **New → Blueprint**, pick this repository and click **Apply**. All settings
+   come from `render.yaml`.
+2. The plan is Starter with a 5 GB disk (about $8.25/month), so documents and files survive
+   restarts. You can raise the disk size later in the dashboard.
+3. When the service is live, open **Environment** and copy `APP_PASSWORD` (the username is
+   `vanguard`) and `CASE_PASSWORD` (the Case File passcode). Change both to values you choose if you prefer.
+4. **Install on your phone:**
+   - **iPhone:** open the URL in Safari, sign in, then tap Share → **Add to Home Screen**.
+   - **Android:** open the URL in Chrome, sign in, then tap ⋮ → **Install app** (or More → Install app inside the app).
 
-Other hosts: `Dockerfile` works anywhere Docker runs; any Python host works with
-`pip install -r requirements.txt` and `sh start.sh`.
+## Moving over from the claude.ai version
+
+Files can't be exported from claude.ai, so the steps are:
+
+1. Get a JSON export of the old register (modules, documents, Case File).
+2. In the app, unlock the Case File first if the export contains Case File records.
+3. Choose **More → Import register…** and pick the JSON file. Modules are matched on code and
+   documents on reference number, so importing twice adds nothing. Reference numbers carry over.
+4. Re-attach files to each record. **Missing file** lists every record that still needs one.
 
 ## Configuration
 
 | Variable | Purpose |
 | --- | --- |
-| `CRM_PASSWORD` | Turns on sign-in. On Render without it, a temporary password is printed in the logs (and changes on restart). |
-| `CRM_USERNAME` | Sign-in username, not case-sensitive (default `vanguard`). |
-| `CRM_DB_PATH` | SQLite file (default `crm.db`). Point it at a persistent disk in production. |
-| `CRM_SEED_DEMO` | `false` skips sample data on first boot. |
-| `ANTHROPIC_API_KEY` | Powers Copilot, note summaries and recaps with Claude. |
-| `CRM_AI_MODEL` | Claude model (default `claude-opus-5`). |
-| `CRM_AI_DISABLED` | Force the built-in (offline) assistant. |
+| `APP_PASSWORD` | Turns on sign-in. On Render without it, a temporary password is printed in the logs (and changes on every restart). |
+| `APP_USERNAME` | Sign-in username, not case-sensitive (default `vanguard`). |
+| `CASE_PASSWORD` | Passcode for the Case File. Leave it unset to switch the Case File off. |
+| `APP_DATA_DIR` | Where the database (`docs.db`) and uploaded files (`files/`) live. Point it at a persistent disk. |
 
 ## Run locally
 
 ```bash
 pip install -r requirements.txt
-python seed.py                      # optional sample data
-python -m uvicorn crm.main:app --reload
+APP_PASSWORD=dev CASE_PASSWORD=dev python -m uvicorn vanguard.main:app --reload
 ```
 
 Open http://localhost:8000. Tests: `pip install -r requirements-dev.txt && python -m pytest tests`.
 
+Other hosts: the `Dockerfile` works anywhere Docker runs (mount a volume at `/data`).
+
 ## Layout
 
 ```
-crm/        FastAPI backend: main.py (API), assistant.py (Copilot), notetaker.py, auth.py, db.py
-web/        Frontend: index.html, styles.css (design system), app.js, copilot.js, PWA files
-tests/      API and Copilot tests
-seed.py     Sample data
+vanguard/   FastAPI backend: main.py (API), auth.py (sign-in, Case File lock), db.py (SQLite)
+web/        Frontend: index.html, styles.css, app.js, PWA manifest, service worker, icons
+tests/      API tests
 ```
 
 ---

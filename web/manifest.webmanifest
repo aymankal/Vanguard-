@@ -1,14 +1,13 @@
 {
-  "name": "Vanguard CRM",
-  "short_name": "Vanguard",
-  "description": "CRM, meeting notes and AI Copilot for Vanguard Services.",
+  "name": "Vanguard Docs",
+  "short_name": "Vanguard Docs",
+  "description": "Document control for Vanguard Services: contracts, licences, HR files and the restricted Case File.",
   "id": "/",
   "start_url": "/#/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "background_color": "#0a1120",
-  "theme_color": "#0a1120",
+  "background_color": "#121715",
+  "theme_color": "#121715",
   "icons": [
     {
       "src": "/static/icon-192.png",
@@ -37,38 +36,8 @@
   ],
   "shortcuts": [
     {
-      "name": "Ask Copilot",
-      "url": "/#/?copilot",
-      "icons": [
-        {
-          "src": "/static/icon-192.png",
-          "sizes": "192x192"
-        }
-      ]
-    },
-    {
-      "name": "Today & tasks",
-      "url": "/#/tasks",
-      "icons": [
-        {
-          "src": "/static/icon-192.png",
-          "sizes": "192x192"
-        }
-      ]
-    },
-    {
-      "name": "Notes",
-      "url": "/#/notes",
-      "icons": [
-        {
-          "src": "/static/icon-192.png",
-          "sizes": "192x192"
-        }
-      ]
-    },
-    {
-      "name": "Pipeline",
-      "url": "/#/pipeline",
+      "name": "Expiring in 30 days",
+      "url": "/#/expiring",
       "icons": [
         {
           "src": "/static/icon-192.png",

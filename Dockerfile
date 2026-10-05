@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    CRM_DB_PATH=/data/crm.db \
+    APP_DATA_DIR=/data \
     PORT=8000
 
 WORKDIR /app

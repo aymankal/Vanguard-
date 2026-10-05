@@ -1,7 +1,6 @@
 __pycache__/
 *.pyc
-crm.db
+data/
 .venv/
 tests/
 .pytest_cache/
-demo/

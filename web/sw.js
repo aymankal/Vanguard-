@@ -1,8 +1,8 @@
-/* Service worker: makes the CRM installable and lets the app shell open offline.
+/* Service worker: makes Vanguard Docs installable and lets the app shell open offline.
    Network-first so every deploy shows up immediately; /api responses are never cached,
-   so client data only ever lives on the server. */
-const CACHE = "vanguard-crm-v1";
-const SHELL = ["/", "/static/styles.css", "/static/app.js", "/static/copilot.js", "/static/logo.png", "/static/icon-192.png"];
+   so documents and files only ever live on the server. */
+const CACHE = "vanguard-docs-v1";
+const SHELL = ["/", "/static/styles.css", "/static/app.js", "/static/logo.png", "/static/icon-192.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {}));
