@@ -203,3 +203,27 @@ main{padding-bottom:calc(20px + env(safe-area-inset-bottom))}
   dialog form{max-height:92dvh;padding-bottom:env(safe-area-inset-bottom)}
 }
 a.btn{text-decoration:none;color:inherit;display:inline-block}
+
+/* ---------- sign-in, approval, team ---------- */
+.auth{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:max(24px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom))}
+.auth-card{width:100%;max-width:400px}
+.auth-card .brand{margin-bottom:22px}
+.auth-card .brand div{display:flex;flex-direction:column}
+.auth-card .brand .mark{width:40px;height:40px}
+.auth-card form,.pending-box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:22px;display:grid;gap:14px}
+.auth-card h1{font-family:var(--f-display);font-size:21px;margin:0}
+.auth-card label{display:grid;gap:6px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.auth-card input{font-size:16px;padding:11px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg);width:100%;text-transform:none;letter-spacing:0;font-weight:400}
+.auth-card .btn.primary{padding:12px;font-weight:600}
+.auth-card .err{padding:0;margin:0}
+.auth-card p{margin:0}
+.auth-msg{background:var(--ok-soft);color:var(--ok);padding:10px 12px;border-radius:var(--r);font-size:14px}
+.auth-links{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.link{border:0;background:none;color:var(--accent);font-weight:600;cursor:pointer;padding:4px 0}
+.auth-card footer{margin-top:20px;font-size:11px;color:var(--muted);text-align:center}
+.team{display:flex;flex-direction:column;gap:8px}
+.team .row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r)}
+.team .row .who{flex:1;min-width:0;overflow-wrap:anywhere}
+.team .row .who small{display:block;color:var(--muted);font-size:12px}
+.team select{padding:7px 8px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg)}
+.team .pend{border-color:var(--warn);background:var(--warn-soft)}

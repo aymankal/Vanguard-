@@ -11,17 +11,48 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Vanguard Docs" />
 <link rel="manifest" href="/manifest.webmanifest" />
-<link rel="icon" href="/static/logo.png" type="image/png" />
-<link rel="apple-touch-icon" href="/static/apple-touch-icon.png" />
+<link rel="icon" href="/logo.png" type="image/png" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" />
-<link rel="stylesheet" href="/static/styles.css" />
+<link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
 
+<section class="auth" id="auth" hidden>
+  <div class="auth-card">
+    <div class="brand"><img class="mark" alt="" width="40" height="40" src="/logo.png"><div><b>VANGUARD</b><span>Document control</span></div></div>
+    <form id="auth-form" novalidate>
+      <h1 id="auth-title">Sign in</h1>
+      <p class="auth-msg" id="auth-msg" hidden></p>
+      <label id="auth-email-l">Email<input id="auth-email" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+      <label id="auth-pass-l">Password<input id="auth-pass" type="password" autocomplete="current-password" minlength="8" required></label>
+      <p class="err" id="auth-err" role="alert" hidden></p>
+      <button class="btn primary" type="submit" id="auth-go">Sign in</button>
+      <div class="auth-links" id="auth-links">
+        <button type="button" class="link" data-auth="forgot">Forgot password?</button>
+        <button type="button" class="link" data-auth="signup">Create an account</button>
+      </div>
+    </form>
+    <footer>&copy; Vanguard Services S.A.L 2026</footer>
+  </div>
+</section>
+
+<section class="auth" id="pending" hidden>
+  <div class="auth-card">
+    <div class="brand"><img class="mark" alt="" width="40" height="40" src="/logo.png"><div><b>VANGUARD</b><span>Document control</span></div></div>
+    <div class="pending-box">
+      <h1>Waiting for approval</h1>
+      <p>You're signed in as <b id="pending-email"></b>. An owner needs to give you access before you can see the register. Ask them to open <b>More → Team</b>.</p>
+      <div class="auth-links"><button class="btn" type="button" data-act="recheck">Check again</button><button class="btn ghost" type="button" data-act="logout">Sign out</button></div>
+    </div>
+  </div>
+</section>
+
+<div id="app" hidden>
 <div class="top">
-  <div class="brand"><img class="mark" alt="Vanguard Services" width="30" height="30" src="/static/logo.png"><b>VANGUARD</b><span>Document control</span></div>
+  <div class="brand"><img class="mark" alt="Vanguard Services" width="30" height="30" src="/logo.png"><b>VANGUARD</b><span>Document control</span></div>
   <button class="btn" id="btn-module" type="button">New module</button>
   <button class="btn primary" id="btn-add" type="button">Add document</button>
   <div class="menu-wrap">
@@ -31,11 +62,14 @@
       <button type="button" data-act="newmod">New module</button>
       <hr>
       <button type="button" data-act="export">Export register (JSON)</button>
-      <label>Import register…<input type="file" id="import-file" accept=".json,application/json" hidden></label>
+      <label id="m-import">Import register…<input type="file" id="import-file" accept=".json,application/json" hidden></label>
       <button type="button" data-act="lockcase" id="m-lockcase" hidden>Lock Case File</button>
+      <button type="button" data-act="passcode" id="m-passcode" hidden>Change Case File passcode</button>
+      <button type="button" data-act="team" id="m-team" hidden>Team</button>
       <hr>
       <button type="button" data-act="theme">Theme: <span id="theme-name">System</span></button>
-      <button type="button" data-act="logout" id="m-logout" hidden>Sign out</button>
+      <button type="button" data-act="logout">Sign out</button>
+      <div class="meta" id="m-who"></div>
       <div class="meta">&copy; Vanguard Services S.A.L 2026</div>
     </div>
   </div>
@@ -49,7 +83,7 @@
       <div class="t"><h1 id="view-title">All documents</h1><p id="view-sub">Every record across every module.</p></div>
       <button class="btn" id="btn-editmod" type="button" hidden>Edit module</button>
     </div>
-    <div class="lockbar" id="lockbar" hidden><b>Restricted</b> Case File records need a separate passcode. They never appear in search, counts, exports or the register until it is unlocked on this device, and it locks again automatically.</div>
+    <div class="lockbar" id="lockbar" hidden><b>Restricted</b> Only owners can open the Case File, and only with its passcode. Its records and files stay out of search, counts, exports and the register until it is unlocked, and it locks again automatically.</div>
     <div class="stats" id="stats"></div>
     <div class="tools">
       <input type="search" id="q" placeholder="Search title, reference, counterparty, tag" aria-label="Search documents">
@@ -66,6 +100,7 @@
 </div>
 
 <div id="drawer-root"></div>
+</div>
 
 <dialog id="dlg-doc">
   <form id="form-doc" method="dialog" novalidate>
@@ -109,9 +144,11 @@
 
 <dialog id="dlg-case">
   <form id="form-case" method="dialog" novalidate>
-    <h2>Unlock Case File</h2>
+    <h2 id="case-title">Unlock Case File</h2>
     <div class="fields">
-      <label class="full">Case File passcode<input id="c-pass" type="password" autocomplete="off" required></label>
+      <label class="full" id="c-cur-l">Current passcode<input id="c-cur" type="password" autocomplete="off"></label>
+      <label class="full"><span id="c-pass-label">Case File passcode</span><input id="c-pass" type="password" autocomplete="off" required></label>
+      <label class="full" id="c-pass2-l">Repeat passcode<input id="c-pass2" type="password" autocomplete="off"></label>
       <p class="unlock-note full" id="case-note"></p>
     </div>
     <div class="err" id="case-err" hidden></div>
@@ -122,9 +159,22 @@
   </form>
 </dialog>
 
-<div class="toast" id="toast" hidden></div>
-<form id="logout-form" method="post" action="/logout" hidden></form>
+<dialog id="dlg-team">
+  <form method="dialog" novalidate>
+    <h2>Team</h2>
+    <div class="fields">
+      <p class="unlock-note full">New people create an account on the sign-in screen, then appear here as <b>Pending</b>. Owners manage the team and the Case File, editors add and change records, viewers can only read.</p>
+      <div class="full team" id="team-list"></div>
+    </div>
+    <div class="err" id="team-err" hidden></div>
+    <div class="actions"><button class="btn primary" type="submit">Done</button></div>
+  </form>
+</dialog>
 
-<script src="/static/app.js"></script>
+<div class="toast" id="toast" hidden></div>
+
+<script src="/vendor/supabase-js-2.117.2.js"></script>
+<script src="/config.js"></script>
+<script src="/app.js"></script>
 </body>
 </html>

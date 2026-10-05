@@ -1,8 +1,8 @@
 /* Service worker: makes Vanguard Docs installable and lets the app shell open offline.
-   Network-first so every deploy shows up immediately; /api responses are never cached,
-   so documents and files only ever live on the server. */
-const CACHE = "vanguard-docs-v1";
-const SHELL = ["/", "/static/styles.css", "/static/app.js", "/static/logo.png", "/static/icon-192.png"];
+   Network-first so every deploy shows up immediately; Supabase (another origin) is never cached,
+   so documents and files only ever live in the cloud. */
+const CACHE = "vanguard-docs-v2";
+const SHELL = ["/", "/styles.css", "/app.js", "/config.js", "/vendor/supabase-js-2.117.2.js", "/logo.png", "/icon-192.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {}));
@@ -18,12 +18,11 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
-  if (event.request.method !== "GET" || url.origin !== location.origin || url.pathname.startsWith("/api/")) return;
+  if (event.request.method !== "GET" || url.origin !== location.origin) return;
   event.respondWith(
     fetch(event.request)
       .then((res) => {
-        // Never cache a sign-in redirect in place of the app shell.
-        if (res.ok && !res.redirected && (url.pathname === "/" || url.pathname.startsWith("/static/"))) {
+        if (res.ok && !res.redirected) {
           const copy = res.clone();
           caches.open(CACHE).then((c) => c.put(event.request, copy));
         }
