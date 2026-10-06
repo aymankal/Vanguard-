@@ -1,7 +1,7 @@
 /* Service worker: makes Vanguard Docs installable and lets the app shell open offline.
    Network-first so every deploy shows up immediately; Supabase (another origin) is never cached,
    so documents and files only ever live in the cloud. */
-const CACHE = "vanguard-docs-v2";
+const CACHE = "vanguard-docs-v3";
 const SHELL = ["/", "/styles.css", "/app.js", "/config.js", "/vendor/supabase-js-2.117.2.js", "/logo.png", "/icon-192.png"];
 
 self.addEventListener("install", (event) => {

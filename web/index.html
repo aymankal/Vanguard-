@@ -4,8 +4,8 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Vanguard Docs</title>
-<meta name="theme-color" content="#121715" media="(prefers-color-scheme: dark)" />
-<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#121715" media="(prefers-color-scheme: dark)" data-auto />
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" data-auto />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -55,6 +55,7 @@
   <div class="brand"><img class="mark" alt="Vanguard Services" width="30" height="30" src="/logo.png"><b>VANGUARD</b><span>Document control</span></div>
   <button class="btn" id="btn-module" type="button">New module</button>
   <button class="btn primary" id="btn-add" type="button">Add document</button>
+  <button class="me" id="btn-me" type="button" aria-label="Your profile"></button>
   <div class="menu-wrap">
     <button class="btn" id="btn-menu" type="button" aria-haspopup="true" aria-expanded="false" aria-label="More">More</button>
     <div class="menu" id="menu" hidden>
@@ -67,7 +68,9 @@
       <button type="button" data-act="passcode" id="m-passcode" hidden>Change Case File passcode</button>
       <button type="button" data-act="team" id="m-team" hidden>Team</button>
       <hr>
-      <button type="button" data-act="theme">Theme: <span id="theme-name">System</span></button>
+      <button type="button" data-act="profile">Profile and picture</button>
+      <button type="button" data-act="theme">Appearance: <span id="theme-name">Auto</span></button>
+      <button type="button" data-act="copilot">Ask Copilot</button>
       <button type="button" data-act="logout">Sign out</button>
       <div class="meta" id="m-who"></div>
       <div class="meta">&copy; Vanguard Services S.A.L 2026</div>
@@ -100,6 +103,20 @@
 </div>
 
 <div id="drawer-root"></div>
+<button class="cp-fab" id="cp-fab" type="button" aria-label="Open Copilot"><span class="avatar logo"><img src="/logo.png" alt=""></span><span>Copilot</span></button>
+<aside class="cp" id="cp" role="dialog" aria-label="Vanguard Copilot" hidden>
+  <header>
+    <span class="avatar logo"><img src="/logo.png" alt=""></span>
+    <div class="t"><b>Vanguard Copilot</b><span>Finds, creates and files. You approve changes.</span></div>
+    <button class="btn ghost" type="button" id="cp-new" title="Start a new chat">New chat</button>
+    <button class="btn ghost" type="button" id="cp-close" aria-label="Close">Close</button>
+  </header>
+  <div class="cp-log" id="cp-log" aria-live="polite"></div>
+  <form class="cp-form" id="cp-form">
+    <textarea id="cp-input" rows="1" maxlength="4000" placeholder="Ask or tell Copilot what to do" aria-label="Message Copilot"></textarea>
+    <button class="btn primary" type="submit" id="cp-send">Send</button>
+  </form>
+</aside>
 </div>
 
 <dialog id="dlg-doc">
@@ -167,6 +184,37 @@
       <div class="full team" id="team-list"></div>
     </div>
     <div class="err" id="team-err" hidden></div>
+    <div class="actions"><button class="btn primary" type="submit">Done</button></div>
+  </form>
+</dialog>
+
+
+<dialog id="dlg-profile">
+  <form id="form-profile" method="dialog" novalidate>
+    <h2>Your profile</h2>
+    <div class="fields">
+      <div class="full profile-pic">
+        <span id="pf-avatar"></span>
+        <div class="row">
+          <label class="btn" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);flex-direction:row">Choose picture<input type="file" id="pf-file" accept="image/png,image/jpeg,image/webp,image/heic" hidden></label>
+          <button class="btn ghost" type="button" id="pf-remove" hidden>Remove</button>
+        </div>
+      </div>
+      <label class="full">Display name<input id="pf-name" maxlength="60" autocomplete="name" placeholder="How your team sees you"></label>
+      <p class="unlock-note full" id="pf-note">Pictures are cropped square and shrunk on your device before upload. Teammates with access to the register can see them.</p>
+    </div>
+    <div class="err" id="pf-err" hidden></div>
+    <div class="actions">
+      <button class="btn ghost" type="button" id="pf-cancel">Cancel</button>
+      <button class="btn primary" type="submit" id="pf-save">Save profile</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-theme">
+  <form method="dialog" novalidate>
+    <h2>Appearance</h2>
+    <div class="fields"><div class="full themes" id="theme-grid"></div></div>
     <div class="actions"><button class="btn primary" type="submit">Done</button></div>
   </form>
 </dialog>
