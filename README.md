@@ -62,6 +62,8 @@ The database lives in the Supabase project `vanguard-docs` (Frankfurt).
 
 ### 1b. Profiles and Copilot (once)
 
+The Copilot works with no AI key at all: a built-in assistant understands plain commands (overview, what expires in 60 days, archive expired, add company X, find X, list modules) and uses the same approval cards. Add a model below only if you want free-form chat.
+
 1. Run `supabase/migrations/20261006090000_profiles_avatars.sql` the same way as step 1. Until you
    do, the app works but profile pictures are off.
 2. Deploy the Copilot function and give it a model. No Azure needed: GitHub Models runs on your

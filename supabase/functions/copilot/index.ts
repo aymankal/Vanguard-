@@ -118,10 +118,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "Use POST." }, 405);
 
+  // No model configured? The built-in assistant below handles plain commands, no key needed.
   const llm = provider();
-  if (!llm) {
-    return json({ error: "The copilot isn't set up yet. An admin needs to add a model provider (AI_BASE_URL, AI_API_KEY and AI_MODEL, or the Azure OpenAI secrets) to the copilot function." }, 500);
-  }
 
   const auth = req.headers.get("Authorization") ?? "";
   const token = auth.replace(/^Bearer\s+/i, "");
@@ -178,7 +176,7 @@ Deno.serve(async (req) => {
       if (await shielded(msgs)) {
         return json({ error: "Blocked by the safety check. Rephrase the request, or review the document text it points at." }, 400);
       }
-      const reply = await chat(llm, [{ role: "system", content: system(role) }, ...msgs], tools);
+      const reply = llm ? await chat(llm, [{ role: "system", content: system(role) }, ...msgs], tools) : ruleChat(msgs, tools);
       const m: Msg = { role: "assistant", content: reply.content ?? null };
       if (reply.tool_calls?.length) {
         m.tool_calls = reply.tool_calls.map((tc: Msg) => ({
@@ -266,6 +264,95 @@ async function chat(llm: Llm, messages: Msg[], tools: unknown[]): Promise<Msg> {
   const m = data?.choices?.[0]?.message;
   if (!m) throw new Error("The AI model sent an empty reply.");
   return m;
+}
+
+/* ------------------------------------------------- built-in assistant (no AI key needed)
+   When no model provider is configured, the Copilot still works: this reads plain commands and
+   turns them into the same tool calls, so approval cards, roles and row-level security behave
+   exactly as they do with a model. */
+const newId = () => "call_" + crypto.randomUUID().replace(/-/g, "").slice(0, 10);
+const call = (name: string, args: Args): Msg => ({ id: newId(), type: "function", function: { name, arguments: JSON.stringify(args) } });
+const say = (content: string): Msg => ({ role: "assistant", content });
+const withTools = (calls: Msg[]): Msg => ({ role: "assistant", content: null, tool_calls: calls });
+const dmy = (d?: string | null) => {
+  if (!d) return "no date";
+  const t = new Date(d + "T00:00:00Z");
+  return isNaN(+t) ? d : `${t.getUTCDate()} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][t.getUTCMonth()]} ${t.getUTCFullYear()}`;
+};
+const line = (d: Args) => `${d.ref} ${d.title}${d.status ? ` (${d.status}` : ""}${d.expiry ? `, ${d.status ? "" : "("}expires ${dmy(d.expiry)}` : ""}${d.status || d.expiry ? ")" : ""}`;
+
+function ruleChat(msgs: Msg[], tools: { function: { name: string } }[]): Msg {
+  const has = (n: string) => tools.some((t) => t.function.name === n);
+  const tail = msgs[msgs.length - 1];
+  const lastUser = String([...msgs].reverse().find((m) => m.role === "user")?.content ?? "");
+  const text = lastUser.toLowerCase();
+
+  if (tail.role === "tool") {
+    const names = new Map<string, string>();
+    msgs.forEach((m) => (m.tool_calls ?? []).forEach((c: Msg) => names.set(c.id, c.function.name)));
+    const results: Msg[] = [];
+    for (let i = msgs.length - 1; i >= 0 && msgs[i].role === "tool"; i--) results.unshift(msgs[i]);
+    const parts: string[] = [];
+    for (const r of results) {
+      let o: Args = {};
+      try { o = JSON.parse(r.content); } catch { /* ignore */ }
+      const name = names.get(r.tool_call_id) ?? "";
+      if (o.rejected) { parts.push("Okay, nothing was changed."); continue; }
+      if (o.error) { parts.push(`That didn't work: ${o.error}`); continue; }
+      if (name === "register_overview") {
+        const st = Object.entries(o.by_status ?? {}).map(([k, v]) => `${v} ${k}`).join(", ") || "none";
+        const bits = [`${o.total} records. ${st}.`];
+        if (o.overdue?.length) bits.push(`Overdue (${o.overdue.length}):\n${o.overdue.slice(0, 5).map((d: Args) => "- " + line(d)).join("\n")}`);
+        if (o.expiring_30_days?.length) bits.push(`Expiring in 30 days (${o.expiring_30_days.length}):\n${o.expiring_30_days.slice(0, 5).map((d: Args) => "- " + line(d)).join("\n")}`);
+        if (o.missing_file_and_link?.length) bits.push(`${o.missing_file_and_link.length} live records have no file or link.`);
+        if (o.still_draft) bits.push(`${o.still_draft} still in Draft.`);
+        if (o.overdue?.length && has("bulk_update_documents")) bits.push(`Say "archive expired" to clean up the overdue ones.`);
+        parts.push(bits.join("\n\n"));
+      } else if (name === "search_documents") {
+        const docs: Args[] = o.documents ?? [];
+        if (/\barchive\b/.test(text) && has("bulk_update_documents")) {
+          const refs = docs.filter((d) => d.status !== "Archived").map((d) => d.ref).slice(0, 25);
+          if (!refs.length) { parts.push("Nothing to archive."); continue; }
+          return withTools([call("bulk_update_documents", { refs, status: "Archived" })]);
+        }
+        parts.push(docs.length ? `${docs.length} found:\n${docs.slice(0, 20).map((d) => "- " + line(d)).join("\n")}` : "No matching documents.");
+      } else if (name === "list_modules") {
+        parts.push((o.modules ?? []).map((m: Args) => `- ${m.code} ${m.name}: ${m.documents} document${m.documents === 1 ? "" : "s"}`).join("\n") || "No modules yet.");
+      } else if (name === "get_document") {
+        parts.push([`${o.ref} ${o.title}`, `Module ${o.module}, ${o.status}${o.party ? `, ${o.party}` : ""}`, `Expiry: ${dmy(o.expiry)}`, o.tags?.length ? `Tags: ${o.tags.join(", ")}` : "", o.notes ? `Notes: ${o.notes}` : "", o.file ? `File: ${o.file}` : o.link ? `Link: ${o.link}` : "No file or link."].filter(Boolean).join("\n"));
+      } else if (o.created === "company") {
+        parts.push(`Company set up as module ${o.module?.code}. Filed: ${(o.documents ?? []).join("; ") || "no documents"}.${o.failed ? ` Failed: ${o.failed.join("; ")}` : ""}`);
+      } else if (o.created === "module") parts.push(`Module ${o.code} created.`);
+      else if (o.created === "document") parts.push(`${o.ref} filed in ${o.module} as ${o.status}.`);
+      else if (o.updated_module) parts.push(`Module ${o.updated_module} updated.`);
+      else if (o.updated !== undefined) parts.push(typeof o.updated === "number" ? `${o.updated} document${o.updated === 1 ? "" : "s"} updated.` : `${o.updated} updated.`);
+      else parts.push("Done.");
+    }
+    return say(parts.join("\n\n"));
+  }
+
+  const write = (n: string, make: () => Msg) => has(n) ? withTools([make()]) : say("Viewers can only read. An owner needs to upgrade you for changes.");
+  const ref = lastUser.match(/\bVG-[A-Z]{2,4}-\d{3,6}\b/i);
+  if (ref) return withTools([call("get_document", { ref: ref[0].toUpperCase() })]);
+
+  const company = lastUser.match(/\b(?:add|create|set ?up|new|onboard)\b[^\n]*?\b(?:company|client|partner)\s*(?:called|named|:)?\s+["“]?([^"”\n,.]{2,60})/i);
+  if (company) {
+    const name = company[1].trim();
+    return write("create_company", () => call("create_company", {
+      name,
+      starter_documents: [{ title: `NDA, ${name}` }, { title: `Master Services Agreement, ${name}` }, { title: `Onboarding checklist, ${name}` }],
+    }));
+  }
+  if (/\barchive\b.*\b(expired|overdue|old)\b/.test(text)) return withTools([call("search_documents", { expiring_within_days: 0, limit: 25 })]);
+  const days = text.match(/(\d{1,3})\s*days?/);
+  if (/\b(expir\w*|renew\w*|due)\b/.test(text)) return withTools([call("search_documents", { expiring_within_days: days ? +days[1] : 30, limit: 25 })]);
+  if (/\b(overdue|expired|lapsed)\b/.test(text)) return withTools([call("search_documents", { expiring_within_days: 0, limit: 25 })]);
+  if (/\b(modules?|folders?)\b/.test(text) && /\b(list|show|what|which|all)\b/.test(text)) return withTools([call("list_modules", {})]);
+  if (/\b(draft|drafts)\b/.test(text)) return withTools([call("search_documents", { status: "Draft", limit: 25 })]);
+  if (/\b(overview|summary|focus|attention|how are we|status|health|risk|today)\b/.test(text)) return withTools([call("register_overview", {})]);
+  const q = lastUser.match(/\b(?:find|search|show|look ?up|get)\s+(?:me\s+)?(?:documents?\s+|records?\s+)?(?:for\s+|about\s+)?["“]?([^"”\n]{2,60})/i);
+  if (q) return withTools([call("search_documents", { query: q[1].trim() })]);
+  return say(`I'm the built-in assistant. Try:\n- "overview" or "what should I focus on today"\n- "what expires in 60 days"\n- "show overdue" or "archive expired"\n- "add company Northwind Analytics"\n- "find Northwind" or a reference like VG-CON-0007\n- "list modules"`);
 }
 
 function describe(name: string, a: Args): string {
