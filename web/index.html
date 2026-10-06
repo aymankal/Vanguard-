@@ -27,13 +27,33 @@
       <h1 id="auth-title">Sign in</h1>
       <p class="auth-msg" id="auth-msg" hidden></p>
       <label id="auth-email-l">Email<input id="auth-email" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
-      <label id="auth-pass-l">Password<input id="auth-pass" type="password" autocomplete="current-password" minlength="8" required></label>
+      <label id="auth-pass-l">Password<input id="auth-pass" type="password" autocomplete="current-password" minlength="8" required><span class="hint" id="auth-hint" hidden>At least 12 characters. A short sentence works well.</span></label>
       <p class="err" id="auth-err" role="alert" hidden></p>
       <button class="btn primary" type="submit" id="auth-go">Sign in</button>
       <div class="auth-links" id="auth-links">
         <button type="button" class="link" data-auth="forgot">Forgot password?</button>
         <button type="button" class="link" data-auth="signup">Create an account</button>
       </div>
+    </form>
+    <footer>&copy; Vanguard Services S.A.L 2026 &middot; <span class="ver"></span></footer>
+  </div>
+</section>
+
+<section class="auth" id="mfa" hidden>
+  <div class="auth-card">
+    <div class="brand"><img class="mark" alt="" width="40" height="40" src="/logo.png"><div><b>VANGUARD</b><span>Document control</span></div></div>
+    <form id="mfa-form" novalidate>
+      <h1 id="mfa-title">Two-step sign-in</h1>
+      <p class="auth-note" id="mfa-note"></p>
+      <div class="mfa-setup" id="mfa-setup" hidden>
+        <img id="mfa-qr" alt="QR code for your authenticator app" width="168" height="168">
+        <p class="auth-note">Can't scan? Enter this key in your app:</p>
+        <code id="mfa-secret" class="mfa-secret"></code>
+      </div>
+      <label>6-digit code<input id="mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]*" placeholder="123456" required></label>
+      <p class="err" id="mfa-err" role="alert" hidden></p>
+      <button class="btn primary" type="submit" id="mfa-go">Verify</button>
+      <div class="auth-links"><button type="button" class="link" id="mfa-out">Sign out</button><button type="button" class="link" id="mfa-skip" hidden>Skip for now</button></div>
     </form>
     <footer>&copy; Vanguard Services S.A.L 2026 &middot; <span class="ver"></span></footer>
   </div>

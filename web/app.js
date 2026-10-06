@@ -103,7 +103,7 @@ STATUSES.forEach(s => { $("f-status").insertAdjacentHTML("beforeend", `<option>$
 
 /* ---------- screens ---------- */
 function showApp(){
-  $("auth").hidden = true; $("pending").hidden = true; $("app").hidden = false;
+  $("auth").hidden = true; $("pending").hidden = true; $("mfa").hidden = true; $("app").hidden = false;
   const w = canWrite();
   $("btn-add").hidden = !w; $("btn-module").hidden = !w; $("m-import").hidden = !w;
   $("m-team").hidden = !isOwner(); $("m-lockcase").hidden = !caseOpen(); $("m-passcode").hidden = !(isOwner() && S.caseInfo.enabled);
@@ -111,12 +111,13 @@ function showApp(){
   notice(S.role === "viewer" ? "You have view access. Ask an owner to make you an editor to file documents." : "");
 }
 function showPending(){
-  $("app").hidden = true; $("auth").hidden = true; $("pending").hidden = false;
+  $("app").hidden = true; $("auth").hidden = true; $("mfa").hidden = true; $("pending").hidden = false;
   $("pending-email").textContent = S.user?.email || "";
 }
 function showAuth(mode, msg){
   S.authMode = mode || "signin";
-  $("app").hidden = true; $("pending").hidden = true; $("auth").hidden = false;
+  $("app").hidden = true; $("pending").hidden = true; $("mfa").hidden = true; $("auth").hidden = false;
+  $("auth-hint").hidden = !(mode === "signup" || mode === "reset");
   const m = S.authMode;
   const titles = { signin:"Sign in", signup:"Create an account", forgot:"Reset your password", reset:"Choose a new password" };
   const go = { signin:"Sign in", signup:"Create account", forgot:"Send reset link", reset:"Save password" };
@@ -134,7 +135,7 @@ $("auth-form").addEventListener("submit", async e => {
   const m = S.authMode, email = $("auth-email").value.trim(), password = $("auth-pass").value;
   const err = msg => { $("auth-err").textContent = msg; $("auth-err").hidden = false; $("auth-go").disabled = false; };
   if (m !== "reset" && !/^\S+@\S+\.\S+$/.test(email)) return err("Enter your email address.");
-  if (m !== "forgot" && password.length < 8) return err("Passwords are at least 8 characters.");
+  if (m !== "forgot" && password.length < (m === "signin" ? 8 : 12)) return err(m === "signin" ? "Enter your password." : "Use at least 12 characters. A short sentence works well.");
   $("auth-go").disabled = true; $("auth-err").hidden = true;
   const back = location.origin + location.pathname;
   try {
@@ -248,7 +249,7 @@ function renderDrawer(){
       </dl>
       ${d.hasFile ? `<div class="filebox">${isImg?`<img id="preview" alt="${esc(d.fileName)}" hidden>`:""}
         <div class="row"><span class="ftype">${esc(fileExt(d))}</span><span style="flex:1;min-width:0;overflow-wrap:anywhere">${esc(d.fileName)}</span><span class="mono" style="color:var(--muted)">${fmtSize(d.fileSize)}</span></div>
-        <div class="row"><button class="btn" type="button" data-act="openfile">Open file</button><button class="btn" type="button" data-act="download">Download</button>${navigator.canShare?`<button class="btn" type="button" data-act="share">Share</button>`:""}</div></div>` : ""}
+        <div class="row"><button class="btn" type="button" data-act="openfile">Open file</button><button class="btn" type="button" data-act="download">Download</button>${canWrite()&&d.moduleId!=="case"?`<button class="btn" type="button" data-act="autofill" title="Read the file with Azure AI and suggest the fields">Auto-fill</button>`:""}${navigator.canShare?`<button class="btn" type="button" data-act="share">Share</button>`:""}</div></div>` : ""}
       ${d.link ? `<div class="filebox"><div class="row"><span class="ftype">link</span><a href="${esc(d.link)}" target="_blank" rel="noopener noreferrer" style="overflow-wrap:anywhere">${esc(d.link)}</a></div></div>` : ""}
       ${!d.hasFile && !d.link ? `<div class="filebox" style="color:var(--bad)">No file or link attached.</div>` : ""}
       ${d.notes ? `<div><div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Notes</div><div class="notes">${esc(d.notes)}</div></div>` : ""}
@@ -278,6 +279,7 @@ document.addEventListener("click", e => {
   else if (act==="delete") deleteDoc(a);
   else if (act==="openfile") openFile(false);
   else if (act==="download") openFile(true);
+  else if (act==="autofill") autofill();
   else if (act==="share") shareDoc();
   else if (act==="export") exportRegister();
   else if (act==="lockcase") lockCase();
@@ -377,7 +379,7 @@ function openDocDialog(d){
   $("d-notes").value = d?.notes || "";
   $("d-file").value = "";
   $("file-hint").textContent = d?.fileName ? `Current file: ${d.fileName}. Choose a new one to replace it.` : "Up to 25 MB. PDF, photos, Word, Excel, PowerPoint, CSV or text.";
-  $("doc-err").hidden = true; $("doc-progress").hidden = true; setSaving(false);
+  $("doc-err").hidden = true; $("doc-err").style.color = ""; $("doc-progress").hidden = true; setSaving(false);
   $("dlg-doc").showModal(); if (matchMedia("(min-width:641px)").matches) $("d-title").focus();
 }
 function setSaving(on, label){ $("doc-save").disabled=on; $("doc-save").textContent = on ? (label||"Saving…") : "Save document"; }
@@ -762,6 +764,85 @@ window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); instal
 async function installApp(){ closeMenu(); if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice.catch(()=>{}); installEvt=null; $("m-install").hidden=true; }
 if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(()=>{}));
 
+/* ---------- two-step sign-in and idle lock ---------- */
+// Everyone needs a second step (authenticator app) before the register loads. The database also
+// checks it for the Copilot functions, and an optional migration enforces it on every table.
+let mfaState = { factorId:"", mode:"verify" };
+async function mfaGate(){
+  try {
+    const { data:aal } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal?.currentLevel === "aal2") return true;
+    const { data:f } = await sb.auth.mfa.listFactors();
+    const done = (f?.totp || []).find(x => x.status === "verified");
+    if (done) { showMfa("verify", done.id); return false; }
+    await showMfa("setup"); return false;
+  } catch(x){ notice(friendly(x)); return true; }  // can't reach the auth service: fall through, the database still enforces access
+}
+async function showMfa(mode, factorId){
+  mfaState = { factorId: factorId || "", mode };
+  $("app").hidden = true; $("auth").hidden = true; $("pending").hidden = true; $("mfa").hidden = false;
+  $("mfa-code").value = ""; $("mfa-err").hidden = true; $("mfa-go").disabled = false; $("mfa-skip").hidden = true;
+  $("mfa-setup").hidden = mode !== "setup";
+  $("mfa-title").textContent = mode === "setup" ? "Secure your account" : "Two-step sign-in";
+  $("mfa-go").textContent = mode === "setup" ? "Turn on two-step" : "Verify";
+  $("mfa-note").textContent = mode === "setup"
+    ? "Vanguard Docs holds contracts and HR files, so every account needs a second step. Scan the code with Microsoft Authenticator, Google Authenticator or 1Password, then enter the 6-digit code."
+    : "Open your authenticator app and enter the 6-digit code for Vanguard Docs.";
+  if (mode === "setup"){
+    try {
+      const { data:f } = await sb.auth.mfa.listFactors();
+      for (const x of (f?.all || []).filter(x => x.status === "unverified")) await sb.auth.mfa.unenroll({ factorId:x.id });
+      const e = await q(sb.auth.mfa.enroll({ factorType:"totp", friendlyName:`Vanguard Docs ${new Date().toISOString().slice(0,10)}` }));
+      mfaState.factorId = e.id; $("mfa-qr").src = e.totp.qr_code; $("mfa-secret").textContent = e.totp.secret;
+    } catch(x){ $("mfa-err").textContent = `Couldn't start setup: ${friendly(x)}`; $("mfa-err").hidden = false; $("mfa-skip").hidden = false; $("mfa-go").disabled = true; }
+  } else setTimeout(() => $("mfa-code").focus(), 50);
+}
+$("mfa-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const code = $("mfa-code").value.replace(/\s/g, "");
+  const err = msg => { $("mfa-err").textContent = msg; $("mfa-err").hidden = false; $("mfa-go").disabled = false; };
+  if (!/^\d{6}$/.test(code)) return err("Enter the 6 digits from your app.");
+  $("mfa-go").disabled = true; $("mfa-err").hidden = true;
+  try {
+    const ch = await q(sb.auth.mfa.challenge({ factorId: mfaState.factorId }));
+    await q(sb.auth.mfa.verify({ factorId: mfaState.factorId, challengeId: ch.id, code }));
+    if (mfaState.mode === "setup") toast("Two-step sign-in is on");
+    await boot();
+  } catch(x){ err(/invalid|expired/i.test(x.message||"") ? "That code didn't work. Wait for a fresh one and try again." : friendly(x)); }
+});
+$("mfa-out").addEventListener("click", () => sb.auth.signOut());
+$("mfa-skip").addEventListener("click", async () => { armIdleLock(); try { await load(); } catch(x){ showApp(); S.loaded = true; render(); notice(friendly(x)); } });
+
+// Sign out after 30 minutes with no activity so a phone left on a desk doesn't stay open.
+const IDLE_MS = 30 * 60 * 1000;
+let idleT = 0;
+function armIdleLock(){
+  const bump = () => { clearTimeout(idleT); idleT = setTimeout(() => { if (S.user){ sb.auth.signOut(); } }, IDLE_MS); };
+  if (!armIdleLock.on){ armIdleLock.on = true; ["pointerdown","keydown","touchstart","scroll"].forEach(ev => addEventListener(ev, bump, { passive:true })); }
+  bump();
+}
+
+/* ---------- auto-fill from file ---------- */
+async function autofill(){
+  const d = findDoc(S.openId); if (!d?.hasFile) return;
+  const btn = document.querySelector('[data-act="autofill"]'); if (btn){ btn.disabled = true; btn.textContent = "Reading file…"; }
+  try {
+    const { data, error } = await sb.functions.invoke("extract", { body:{ ref:d.ref } });
+    if (error) throw await fnError(error);
+    if (data?.error) throw new Error(data.error);
+    const s = data.suggestion || {};
+    openDocDialog(d);
+    if (s.title) $("d-title").value = s.title;
+    if (s.party) $("d-party").value = s.party;
+    if (s.expiry) $("d-expiry").value = s.expiry;
+    if (s.status) $("d-status").value = s.status;
+    if (s.tags?.length) $("d-tags").value = [...new Set([...(d.tags||[]), ...s.tags])].slice(0,12).join(", ");
+    if (s.summary) $("d-notes").value = d.notes ? `${d.notes}\n\n${s.summary}` : s.summary;
+    $("doc-err").textContent = "Auto-fill suggestions are in the form. Check them, then save."; $("doc-err").hidden = false; $("doc-err").style.color = "var(--ok)";
+  } catch(x){ toast(friendly(x)); }
+  finally { if (btn?.isConnected){ btn.disabled = false; btn.textContent = "Auto-fill"; } }
+}
+
 /* ---------- boot ---------- */
 { const h = location.hash.replace(/^#\/?/, ""); if (["expiring","nofile"].includes(h)) S.view = h; }
 let recovering = false;
@@ -770,6 +851,8 @@ async function boot(){
   S.user = session?.user || null;
   if (!S.user) return showAuth(S.authMode === "reset" ? "signin" : S.authMode);
   if (recovering) return showAuth("reset");
+  if (!(await mfaGate())) return;
+  armIdleLock();
   try { await load(); }
   catch(x){ showApp(); S.loaded = true; render(); notice(friendly(x)); }
 }

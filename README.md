@@ -35,6 +35,13 @@ the public key in `web/config.js` can't read anything on its own.
   documents), files and updates documents, reviews the whole register (overdue, expiring, missing files) and runs bulk clean-ups such as archiving expired records. Reads run straight away; every change waits for your
   approval. It runs as you, so database permissions still decide what it may do, and it never
   touches the Case File or deletes anything.
+- **Secure sign-in:** every account needs a second step (an authenticator app such as Microsoft
+  Authenticator) before the register loads. Passwords are 12+ characters, idle sessions sign out
+  after 30 minutes, and the Copilot functions refuse sessions without the second step. An optional
+  migration (`20261006100000_require_two_step.sql`) makes the database enforce it on every table.
+- **Auto-fill from file** (Azure AI Document Intelligence + Azure OpenAI): open a record with a file,
+  tap Auto-fill, and it proposes the counterparty, expiry, status, tags and a short summary in the
+  edit form. Nothing saves until you do.
 - **Themes:** ten, picked under **More → Appearance** (Auto, Daylight, Night, Midnight, Emerald,
   Violet, Sunset, Rose, Sand, Contrast). Remembered per device.
 - **Profile pictures:** set a display name and picture under **More → Profile and picture**.
@@ -68,7 +75,19 @@ supabase secrets set \
 supabase functions deploy copilot
 ```
 
-   Optional: `AZURE_OPENAI_API_VERSION` (defaults to `2024-10-21`). The deployment needs a chat
+   Optional: `AZURE_OPENAI_API_VERSION` (defaults to `2024-10-21`).
+
+   For Auto-fill add an Azure AI Document Intelligence resource and deploy the second function:
+
+```bash
+supabase secrets set AZURE_DOC_INTELLIGENCE_ENDPOINT=https://<resource>.cognitiveservices.azure.com AZURE_DOC_INTELLIGENCE_KEY=<key>
+supabase functions deploy extract
+```
+
+   To screen the Copilot for jailbreaks and instructions hidden inside document text, add an Azure
+   AI Content Safety resource: `AZURE_CONTENT_SAFETY_ENDPOINT` and `AZURE_CONTENT_SAFETY_KEY`.
+   Leave them unset and the screen is off.
+ The deployment needs a chat
    model with function calling, such as gpt-4o or gpt-4.1. The key stays in Supabase and never
    reaches the browser.
 

@@ -10,6 +10,10 @@
 //   AZURE_OPENAI_API_KEY      key from Azure AI Foundry / Azure portal
 //   AZURE_OPENAI_DEPLOYMENT   the deployment name of your chat model
 //   AZURE_OPENAI_API_VERSION  optional, defaults to 2024-10-21
+//   AZURE_CONTENT_SAFETY_ENDPOINT / AZURE_CONTENT_SAFETY_KEY
+//                             optional. When set, every turn passes Azure AI Content Safety
+//                             Prompt Shields first (blocks jailbreaks and instructions hidden
+//                             inside document text).
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 const CORS = {
@@ -124,6 +128,7 @@ Deno.serve(async (req) => {
   });
   const { data: u, error: ue } = await sb.auth.getUser(token);
   if (ue || !u?.user) return json({ error: "Sign in again." }, 401);
+  if (jwtAal(token) !== "aal2") return json({ error: "Finish two-step sign-in first." }, 403);
   const { data: me } = await sb.from("members").select("role").eq("user_id", u.user.id).maybeSingle();
   const role = me?.role as string | undefined;
   if (!role || !["owner", "editor", "viewer"].includes(role)) return json({ error: "You don't have access yet." }, 403);
@@ -167,6 +172,9 @@ Deno.serve(async (req) => {
         }
       }
 
+      if (await shielded(msgs)) {
+        return json({ error: "Blocked by the safety check. Rephrase the request, or review the document text it points at." }, 400);
+      }
       const reply = await chat(endpoint, deployment, version, apiKey, [{ role: "system", content: system(role) }, ...msgs], tools);
       const m: Msg = { role: "assistant", content: reply.content ?? null };
       if (reply.tool_calls?.length) {
@@ -182,6 +190,31 @@ Deno.serve(async (req) => {
     return json({ error: e instanceof Error ? e.message : "The copilot failed. Try again." }, 502);
   }
 });
+
+function jwtAal(token: string): string {
+  try {
+    const p = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return String(p.aal ?? "");
+  } catch { return ""; }
+}
+
+// Azure AI Content Safety Prompt Shields: checks the latest user message and any document text the
+// tools returned (where hidden instructions would live). Off unless both secrets are set.
+async function shielded(msgs: Msg[]): Promise<boolean> {
+  const ep = Deno.env.get("AZURE_CONTENT_SAFETY_ENDPOINT");
+  const key = Deno.env.get("AZURE_CONTENT_SAFETY_KEY");
+  if (!ep || !key) return false;
+  const userPrompt = String([...msgs].reverse().find((m) => m.role === "user")?.content ?? "").slice(0, 9000);
+  const documents = msgs.filter((m) => m.role === "tool").slice(-5).map((m) => String(m.content).slice(0, 1800));
+  const r = await fetch(`${ep.replace(/\/+$/, "")}/contentsafety/text:shieldPrompt?api-version=2024-09-01`, {
+    method: "POST",
+    headers: { "Ocp-Apim-Subscription-Key": key, "Content-Type": "application/json" },
+    body: JSON.stringify({ userPrompt: userPrompt || " ", documents }),
+  });
+  if (!r.ok) throw new Error(`The safety check is unavailable (${r.status}).`);
+  const d = await r.json();
+  return !!d?.userPromptAnalysis?.attackDetected || (d?.documentsAnalysis ?? []).some((x: Msg) => x?.attackDetected);
+}
 
 // Keep only well-formed turns, cap the history, and never start mid tool-call.
 function clean(input: unknown): Msg[] {

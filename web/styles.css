@@ -322,3 +322,11 @@ a.btn{text-decoration:none;color:inherit;display:inline-block}
 @media (prefers-reduced-motion:no-preference){.cp{animation:slide .18s ease-out}}
 
 .ver{font-family:var(--f-mono);text-transform:lowercase}
+
+/* ---------- two-step sign-in ---------- */
+.auth-note{font-size:14px;color:var(--muted)}
+.mfa-setup{display:grid;gap:10px;justify-items:center;padding:14px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg)}
+.mfa-setup img{background:#fff;padding:8px;border-radius:var(--r);image-rendering:pixelated}
+.mfa-secret{font-family:var(--f-mono);font-size:13px;letter-spacing:.08em;word-break:break-all;text-align:center;user-select:all}
+#mfa-code{font-family:var(--f-mono);font-size:22px;letter-spacing:.3em;text-align:center}
+.auth-card .hint{font-weight:400;text-transform:none;letter-spacing:0;font-size:12px}
