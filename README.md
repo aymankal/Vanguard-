@@ -32,7 +32,7 @@ the public key in `web/config.js` can't read anything on its own.
 
 - **Copilot:** a tool-using AI agent (Azure OpenAI / Azure AI Foundry) built into the app. It
   searches the register, reports what's expiring, sets up a new company (a module plus starter
-  documents), files and updates documents. Reads run straight away; every change waits for your
+  documents), files and updates documents, reviews the whole register (overdue, expiring, missing files) and runs bulk clean-ups such as archiving expired records. Reads run straight away; every change waits for your
   approval. It runs as you, so database permissions still decide what it may do, and it never
   touches the Case File or deletes anything.
 - **Themes:** ten, picked under **More → Appearance** (Auto, Daylight, Night, Midnight, Emerald,

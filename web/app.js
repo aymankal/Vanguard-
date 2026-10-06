@@ -76,6 +76,7 @@ async function load(){
   const all = docs.map(docOut);
   S.docs = all.filter(d => d.moduleId !== "case"); S.vault = all.filter(d => d.moduleId === "case");
   S.loaded = true;
+  if (!S.cp.messages.length) cpRestore();
   loadProfiles();
   if (!["all","expiring","nofile"].includes(S.view) && !modById(S.view)) S.view = "all";
   if (S.view === "case" && !caseOpen()) S.view = "all";
@@ -676,8 +677,8 @@ $("form-profile").addEventListener("submit", async e => {
 /* ---------- copilot ---------- */
 // The copilot is an Azure OpenAI tool-calling agent that runs in the `copilot` edge function, as
 // you. It reads freely; anything that changes the register comes back as a card you approve.
-const CP_HINTS = ["What expires in the next 30 days?", "Set up a new company called Acme Trading with an NDA and an MSA", "Show everything still in Draft", "List my modules"];
-const CP_LOOK = { list_modules:"Checked the modules", search_documents:"Searched the register", get_document:"Opened a record" };
+const CP_HINTS = ["How is the register doing? What needs attention?", "What expires in the next 30 days?", "Set up a new company called Acme Trading with an NDA and an MSA", "Show everything still in Draft", "List my modules"];
+const CP_LOOK = { list_modules:"Checked the modules", search_documents:"Searched the register", get_document:"Opened a record", register_overview:"Reviewed the whole register" };
 const mdLite = t => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>");
 const parseJson = t => { try { return JSON.parse(t); } catch(e){ return null; } };
 const logoAv = '<span class="avatar logo"><img src="/logo.png" alt=""></span>';
@@ -685,6 +686,8 @@ function doneText(r){
   if (r.created === "company") return `Set up ${r.module.code} · ${r.module.name}${r.documents?.length ? `, filed ${r.documents.length} starter document${r.documents.length>1?"s":""}` : ""}${r.failed?.length ? `. Failed: ${r.failed.join("; ")}` : ""}`;
   if (r.created === "module") return `Created module ${r.code} · ${r.name}`;
   if (r.created === "document") return `Filed ${r.ref} · ${r.title}`;
+  if (r.updated_module) return `Updated module ${r.updated_module} · ${r.name}`;
+  if (typeof r.updated === "number") return `Changed ${r.updated} document${r.updated===1?"":"s"}${r.not_found?.length ? `. Not found: ${r.not_found.join(", ")}` : ""}`;
   if (r.updated) return `Updated ${r.updated} · ${r.title}${r.note ? `. ${r.note}` : ""}`;
   return "Done";
 }
@@ -713,6 +716,9 @@ function cpRender(){
   $("cp-log").innerHTML = h; $("cp-log").scrollTop = $("cp-log").scrollHeight;
   $("cp-send").disabled = $("cp-input").disabled = c.busy || !!c.pending;
 }
+const CP_KEY = "vg-copilot";
+function cpSave(){ try{ sessionStorage.setItem(CP_KEY, JSON.stringify({ u:S.user?.id, m:S.cp.messages.slice(-40), p:S.cp.pending })); }catch(e){} }
+function cpRestore(){ try{ const j = JSON.parse(sessionStorage.getItem(CP_KEY)||"null"); if (j && j.u===S.user?.id && Array.isArray(j.m)){ S.cp.messages=j.m; S.cp.pending=j.p||null; } }catch(e){} }
 function cpOpen(on){
   S.cp.open = on; $("cp").hidden = !on; $("cp-fab").hidden = on;
   if (on){ cpRender(); setTimeout(() => { if (!$("cp-input").disabled) $("cp-input").focus(); }, 60); }
@@ -727,14 +733,14 @@ async function cpCall(decisions){
     const { data, error } = await sb.functions.invoke("copilot", { body:{ messages:c.messages, decisions } });
     if (error) throw await fnError(error);
     if (data?.error) throw new Error(data.error);
-    c.messages = data.messages; c.pending = data.pending?.length ? data.pending : null;
+    c.messages = data.messages; c.pending = data.pending?.length ? data.pending : null; cpSave();
     if (data.wrote) load().catch(() => {});
   } catch(x){ c.err = friendly(x); }
   c.busy = false; cpRender();
 }
 function cpSend(text){
   const t = String(text || "").trim(); if (!t || S.cp.busy || S.cp.pending) return;
-  S.cp.messages.push({ role:"user", content:t }); $("cp-input").value = ""; $("cp-input").style.height = "";
+  S.cp.messages.push({ role:"user", content:t }); cpSave(); $("cp-input").value = ""; $("cp-input").style.height = "";
   cpCall({});
 }
 function cpDecide(yes){
@@ -746,7 +752,7 @@ $("cp-input").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shi
 $("cp-input").addEventListener("input", e => { e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"; });
 $("cp-fab").addEventListener("click", () => cpOpen(true));
 $("cp-close").addEventListener("click", () => cpOpen(false));
-$("cp-new").addEventListener("click", () => { if (S.cp.busy) return; S.cp.messages = []; S.cp.pending = null; S.cp.err = ""; cpRender(); });
+$("cp-new").addEventListener("click", () => { if (S.cp.busy) return; S.cp.messages = []; S.cp.pending = null; S.cp.err = ""; cpSave(); cpRender(); });
 
 /* ---------- version ---------- */
 document.querySelectorAll(".ver").forEach(e => { e.textContent = `v${CFG.version} ${CFG.channel}`; });
@@ -769,7 +775,7 @@ async function boot(){
 }
 sb.auth.onAuthStateChange((event, session) => {
   if (event === "PASSWORD_RECOVERY"){ recovering = true; S.user = session?.user || null; return showAuth("reset"); }
-  if (event === "SIGNED_OUT"){ Object.assign(S, { user:null, role:null, docs:[], vault:[], modules:[], loaded:false, openId:null, view:"all", profiles:{}, avatarUrls:{}, cp:{ messages:[], busy:false, pending:null, err:"", open:false } }); cpOpen(false); renderDrawer(); return showAuth("signin"); }
+  if (event === "SIGNED_OUT"){ Object.assign(S, { user:null, role:null, docs:[], vault:[], modules:[], loaded:false, openId:null, view:"all", profiles:{}, avatarUrls:{}, cp:{ messages:[], busy:false, pending:null, err:"", open:false } }); cpOpen(false); try{ sessionStorage.removeItem("vg-copilot"); }catch(e){} renderDrawer(); return showAuth("signin"); }
   // Defer: supabase-js must not be called from inside this callback.
   if (event === "SIGNED_IN" && (!S.user || S.user.id !== session?.user?.id)){ S.user = session.user; setTimeout(() => !recovering && boot(), 0); }
 });

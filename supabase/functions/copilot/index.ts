@@ -21,8 +21,8 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
 const STATUSES = ["Draft", "Active", "In review", "Expired", "Archived"];
-const READ = new Set(["list_modules", "search_documents", "get_document"]);
-const WRITE = new Set(["create_module", "create_company", "create_document", "update_document"]);
+const READ = new Set(["list_modules", "search_documents", "get_document", "register_overview"]);
+const WRITE = new Set(["create_module", "create_company", "create_document", "update_document", "update_module", "bulk_update_documents"]);
 const MAX_STEPS = 8;
 
 // deno-lint-ignore no-explicit-any
@@ -48,6 +48,7 @@ const TOOLS = [
     expiring_within_days: { type: "integer", description: "Only documents expiring (or already expired) within N days." },
     limit: { type: "integer", description: "Max 50, default 25." },
   }),
+  fn("register_overview", "One-call health check of the register: totals by status and module, overdue, expiring in 30 days, and records with no file or link. Use it for \"how are we doing\" questions and before suggesting clean-up.", {}),
   fn("get_document", "Get the full record of one document by reference, e.g. VG-CON-0007.", {
     ref: { type: "string" },
   }, ["ref"]),
@@ -65,6 +66,15 @@ const TOOLS = [
       items: { type: "object", properties: { title: { type: "string" }, status: { type: "string", enum: STATUSES }, expiry: { type: "string" }, notes: { type: "string" } }, required: ["title"] },
     },
   }, ["name"]),
+  fn("update_module", "Rename a module or change its description. The code never changes, so existing references stay valid.", {
+    code: { type: "string" }, name: { type: "string" }, description: { type: "string" },
+  }, ["code"]),
+  fn("bulk_update_documents", "Apply the same change (status, expiry, or tags to add) to up to 25 documents by reference. Use it for clean-ups such as archiving expired records.", {
+    refs: { type: "array", items: { type: "string" }, maxItems: 25 },
+    status: { type: "string", enum: STATUSES },
+    expiry: { type: "string", description: "YYYY-MM-DD" },
+    add_tags: { type: "array", items: { type: "string" } },
+  }, ["refs"]),
   fn("create_document", "Create a document record in a module. A reference number is issued automatically. Files are attached by people in the app, not by you.", {
     title: { type: "string" },
     module_code: { type: "string" },
@@ -87,6 +97,8 @@ You find, create and organise records by calling tools. You do not guess.
 - Look things up with tools before answering. Never invent references, dates or counts.
 - To create or change anything, call the write tool directly. The person sees an approval card and confirms, so do not ask "shall I?" first.
 - A module is a folder with a 2 to 4 letter code. A new company, client or partner means create_company.
+- For broad questions ("how are we doing", "what needs attention"), call register_overview first, then drill into the worst items and propose concrete next steps. Offer clean-ups with bulk_update_documents.
+- You can chain several tool calls in one turn. Finish the whole job before replying.
 - Choose sensible defaults: new unsigned items are "Draft", signed ones "Active". Ask one short question only when a required detail is truly missing.
 - You cannot delete anything, attach files, or touch the restricted Case File. If asked, say so in one line.
 - Viewers can only read. If a viewer asks for a change, say an owner must upgrade them.
@@ -215,6 +227,11 @@ function describe(name: string, a: Args): string {
       return `Set up company "${str(a.name, 60)}"${a.code ? ` (${str(a.code, 4).toUpperCase()})` : ""} with ${n} starter document${n === 1 ? "" : "s"}`;
     }
     case "create_document": return `Add "${str(a.title, 160)}" to ${str(a.module_code, 4).toUpperCase()}${a.status ? ` as ${a.status}` : ""}${a.expiry ? `, expires ${a.expiry}` : ""}`;
+    case "update_module": return `Update module ${str(a.code, 4).toUpperCase()}: ${Object.keys(a).filter((k) => k !== "code").join(", ") || "no changes"}`;
+    case "bulk_update_documents": {
+      const n = Array.isArray(a.refs) ? a.refs.length : 0;
+      return `Change ${n} document${n === 1 ? "" : "s"}${a.status ? ` to ${a.status}` : ""}${a.expiry ? `, expiry ${a.expiry}` : ""}${a.add_tags?.length ? `, add tags ${a.add_tags.join(", ")}` : ""}`;
+    }
     case "update_document": {
       const keys = Object.keys(a).filter((k) => k !== "ref");
       return `Update ${str(a.ref, 30)}: ${keys.length ? keys.join(", ") : "no changes"}`;
@@ -230,6 +247,9 @@ async function run(sb: SupabaseClient, name: string, a: Args): Promise<Args> {
       case "list_modules": return await listModules(sb);
       case "search_documents": return await searchDocuments(sb, a);
       case "get_document": return await getDocument(sb, a);
+      case "register_overview": return await registerOverview(sb);
+      case "update_module": return await updateModule(sb, a);
+      case "bulk_update_documents": return await bulkUpdate(sb, a);
       case "create_module": return await createModule(sb, a);
       case "create_company": return await createCompany(sb, a);
       case "create_document": return await createDocument(sb, a);
@@ -393,4 +413,51 @@ async function updateDocument(sb: SupabaseClient, a: Args) {
   const d = await ok(sb.from("documents").update(row).eq("ref", ref).eq("is_case", false).select("ref,title,status").maybeSingle()) as Args | null;
   if (!d) throw new Error(`No document ${ref}, or you can't change it.`);
   return { updated: d.ref, title: d.title, status: d.status, moved_to: a.module_code ? str(a.module_code, 4).toUpperCase() : undefined, note: a.module_code ? "Moving to another module issues a new reference number." : undefined };
+}
+
+async function registerOverview(sb: SupabaseClient) {
+  const mods = await modulesByCode(sb);
+  const docs = await ok(sb.from("documents").select("ref,title,status,expiry,module_id,file_path,link").eq("is_case", false)) as Args[];
+  const today = new Date().toISOString().slice(0, 10);
+  const soon = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  const live = docs.filter((d) => d.status !== "Archived");
+  const brief = (d: Args) => ({ ref: d.ref, title: d.title, status: d.status, expiry: d.expiry });
+  const byStatus: Record<string, number> = {};
+  docs.forEach((d) => { byStatus[d.status] = (byStatus[d.status] ?? 0) + 1; });
+  return {
+    total: docs.length,
+    by_status: byStatus,
+    by_module: mods.map((m) => ({ code: m.code, name: m.name, documents: docs.filter((d) => d.module_id === m.id).length })),
+    overdue: live.filter((d) => d.expiry && d.expiry < today).slice(0, 15).map(brief),
+    expiring_30_days: live.filter((d) => d.expiry && d.expiry >= today && d.expiry <= soon).slice(0, 15).map(brief),
+    missing_file_and_link: live.filter((d) => !d.file_path && !d.link).slice(0, 15).map(brief),
+    still_draft: docs.filter((d) => d.status === "Draft").length,
+  };
+}
+async function updateModule(sb: SupabaseClient, a: Args) {
+  const mod = await moduleFor(sb, a.code);
+  const row: Args = {};
+  if (a.name !== undefined) { row.name = str(a.name, 60); if (!row.name) throw new Error("A module needs a name."); }
+  if (a.description !== undefined) row.description = str(a.description, 160);
+  if (!Object.keys(row).length) throw new Error("Nothing to change.");
+  const m = await ok(sb.from("modules").update(row).eq("id", mod.id).select("code,name").single()) as Args;
+  return { updated_module: m.code, name: m.name };
+}
+async function bulkUpdate(sb: SupabaseClient, a: Args) {
+  const refs = [...new Set((Array.isArray(a.refs) ? a.refs : []).map((r: unknown) => str(r, 30).toUpperCase()).filter(Boolean))].slice(0, 25);
+  if (!refs.length) throw new Error("No references given.");
+  const row = docRow({ status: a.status, expiry: a.expiry }, true);
+  if (a.add_tags?.length) {
+    const cur = await ok(sb.from("documents").select("ref,tags").in("ref", refs).eq("is_case", false)) as Args[];
+    let n = 0;
+    for (const d of cur) {
+      const tags = docRow({ tags: [...(d.tags ?? []), ...a.add_tags] }, true).tags;
+      await ok(sb.from("documents").update({ ...row, tags }).eq("ref", d.ref).eq("is_case", false).select("ref"));
+      n++;
+    }
+    return { updated: n, refs: cur.map((d) => d.ref) };
+  }
+  if (!Object.keys(row).length) throw new Error("Nothing to change.");
+  const done = await ok(sb.from("documents").update(row).in("ref", refs).eq("is_case", false).select("ref")) as Args[];
+  return { updated: done.length, refs: done.map((d) => d.ref), not_found: refs.filter((r) => !done.some((d) => d.ref === r)) };
 }
