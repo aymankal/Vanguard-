@@ -30,7 +30,7 @@ the public key in `web/config.js` can't read anything on its own.
 - **Export and import** the register as JSON from the More menu. Import also accepts the
   claude.ai version's data.
 
-- **Copilot:** a tool-using AI agent (Azure OpenAI / Azure AI Foundry) built into the app. It
+- **Copilot:** a tool-using AI agent (GitHub Models or any OpenAI-compatible model; Azure optional) built into the app. It
   searches the register, reports what's expiring, sets up a new company (a module plus starter
   documents), files and updates documents, reviews the whole register (overdue, expiring, missing files) and runs bulk clean-ups such as archiving expired records. Reads run straight away; every change waits for your
   approval. It runs as you, so database permissions still decide what it may do, and it never
@@ -39,7 +39,7 @@ the public key in `web/config.js` can't read anything on its own.
   Authenticator) before the register loads. Passwords are 12+ characters, idle sessions sign out
   after 30 minutes, and the Copilot functions refuse sessions without the second step. An optional
   migration (`20261006100000_require_two_step.sql`) makes the database enforce it on every table.
-- **Auto-fill from file** (Azure AI Document Intelligence + Azure OpenAI): open a record with a file,
+- **Auto-fill from file** (your AI model; Azure Document Intelligence optional for PDFs and images): open a record with a file,
   tap Auto-fill, and it proposes the counterparty, expiry, status, tags and a short summary in the
   edit form. Nothing saves until you do.
 - **Themes:** ten, picked under **More → Appearance** (Auto, Daylight, Night, Midnight, Emerald,
@@ -64,32 +64,28 @@ The database lives in the Supabase project `vanguard-docs` (Frankfurt).
 
 1. Run `supabase/migrations/20261006090000_profiles_avatars.sql` the same way as step 1. Until you
    do, the app works but profile pictures are off.
-2. Deploy the Copilot function and give it your Azure OpenAI details (Azure AI Foundry → your
-   resource → Keys and Endpoint, plus the name of your chat model deployment):
+2. Deploy the Copilot function and give it a model. No Azure needed: GitHub Models runs on your
+   GitHub account. Create a personal access token (github.com/settings/personal-access-tokens)
+   with the **Models: read** permission, then:
 
 ```bash
 supabase secrets set \
-  AZURE_OPENAI_ENDPOINT=https://<resource>.openai.azure.com \
-  AZURE_OPENAI_API_KEY=<key> \
-  AZURE_OPENAI_DEPLOYMENT=<deployment name>
+  AI_BASE_URL=https://models.github.ai/inference \
+  AI_API_KEY=<github token> \
+  AI_MODEL=openai/gpt-4.1
 supabase functions deploy copilot
-```
-
-   Optional: `AZURE_OPENAI_API_VERSION` (defaults to `2024-10-21`).
-
-   For Auto-fill add an Azure AI Document Intelligence resource and deploy the second function:
-
-```bash
-supabase secrets set AZURE_DOC_INTELLIGENCE_ENDPOINT=https://<resource>.cognitiveservices.azure.com AZURE_DOC_INTELLIGENCE_KEY=<key>
 supabase functions deploy extract
 ```
 
-   To screen the Copilot for jailbreaks and instructions hidden inside document text, add an Azure
-   AI Content Safety resource: `AZURE_CONTENT_SAFETY_ENDPOINT` and `AZURE_CONTENT_SAFETY_KEY`.
-   Leave them unset and the screen is off.
- The deployment needs a chat
-   model with function calling, such as gpt-4o or gpt-4.1. The key stays in Supabase and never
-   reaches the browser.
+   Any OpenAI-compatible endpoint works the same way (OpenAI, OpenRouter, ...): change the three
+   values. The model must support function calling. Azure OpenAI is still supported as an
+   alternative (`AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT`).
+
+   Auto-fill reads plain text files with the same model. For PDFs, Word files and images, add an
+   optional Azure AI Document Intelligence resource (`AZURE_DOC_INTELLIGENCE_ENDPOINT`,
+   `AZURE_DOC_INTELLIGENCE_KEY`). To screen the Copilot for jailbreaks, add the optional Azure AI
+   Content Safety pair `AZURE_CONTENT_SAFETY_ENDPOINT` and `AZURE_CONTENT_SAFETY_KEY`. Unset, both
+   are simply off. Keys stay in Supabase and never reach the browser.
 
 ### 2. Hosting (free)
 
@@ -141,7 +137,7 @@ Open http://localhost:8000. It runs against the Supabase project in `web/config.
 
 ```
 supabase/migrations/   Database schema, row-level security, Case File functions, storage buckets, profiles
-supabase/functions/    copilot: the Azure OpenAI agent (Deno edge function)
+supabase/functions/    copilot: the AI agent (Deno edge function)
 web/                   The app: index.html, styles.css, app.js, config.js, PWA files, icons
 web/vendor/            supabase-js 2.117.2 (bundled so the app shell opens offline)
 render.yaml            Free static hosting with security headers

@@ -677,7 +677,7 @@ $("form-profile").addEventListener("submit", async e => {
 });
 
 /* ---------- copilot ---------- */
-// The copilot is an Azure OpenAI tool-calling agent that runs in the `copilot` edge function, as
+// The copilot is a tool-calling AI agent that runs in the `copilot` edge function, as
 // you. It reads freely; anything that changes the register comes back as a card you approve.
 const CP_HINTS = ["How is the register doing? What needs attention?", "What expires in the next 30 days?", "Set up a new company called Acme Trading with an NDA and an MSA", "Show everything still in Draft", "List my modules"];
 const CP_LOOK = { list_modules:"Checked the modules", search_documents:"Searched the register", get_document:"Opened a record", register_overview:"Reviewed the whole register" };
