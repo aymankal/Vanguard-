@@ -320,3 +320,5 @@ a.btn{text-decoration:none;color:inherit;display:inline-block}
 .cp-typing{color:var(--muted);font-size:13px;padding-left:38px}
 @media (max-width:640px){.cp-fab span{display:none}.cp-fab{padding:6px}.cp{width:100%}}
 @media (prefers-reduced-motion:no-preference){.cp{animation:slide .18s ease-out}}
+
+.ver{font-family:var(--f-mono);text-transform:lowercase}

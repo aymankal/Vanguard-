@@ -748,6 +748,9 @@ $("cp-fab").addEventListener("click", () => cpOpen(true));
 $("cp-close").addEventListener("click", () => cpOpen(false));
 $("cp-new").addEventListener("click", () => { if (S.cp.busy) return; S.cp.messages = []; S.cp.pending = null; S.cp.err = ""; cpRender(); });
 
+/* ---------- version ---------- */
+document.querySelectorAll(".ver").forEach(e => { e.textContent = `v${CFG.version} ${CFG.channel}`; });
+
 /* ---------- install ---------- */
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; $("m-install").hidden = false; });
 async function installApp(){ closeMenu(); if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice.catch(()=>{}); installEvt=null; $("m-install").hidden=true; }

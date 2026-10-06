@@ -1,4 +1,4 @@
-# Vanguard Docs
+# Vanguard Docs (v0.9.0 beta)
 
 <img src="web/logo.png" alt="Vanguard" width="72" />
 
