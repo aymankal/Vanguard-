@@ -1,4 +1,4 @@
-# Vanguard Docs
+# Vanguard Docs (v0.9.0 beta)
 
 <img src="web/logo.png" alt="Vanguard" width="72" />
 
@@ -30,6 +30,17 @@ the public key in `web/config.js` can't read anything on its own.
 - **Export and import** the register as JSON from the More menu. Import also accepts the
   claude.ai version's data.
 
+- **Copilot:** a tool-using AI agent (Azure OpenAI / Azure AI Foundry) built into the app. It
+  searches the register, reports what's expiring, sets up a new company (a module plus starter
+  documents), files and updates documents, reviews the whole register (overdue, expiring, missing files) and runs bulk clean-ups such as archiving expired records. Reads run straight away; every change waits for your
+  approval. It runs as you, so database permissions still decide what it may do, and it never
+  touches the Case File or deletes anything.
+- **Themes:** ten, picked under **More → Appearance** (Auto, Daylight, Night, Midnight, Emerald,
+  Violet, Sunset, Rose, Sand, Contrast). Remembered per device.
+- **Profile pictures:** set a display name and picture under **More → Profile and picture**.
+  Pictures are cropped square and shrunk on your device, kept in a private bucket, and shown in
+  the top bar and the Team list.
+
 ## Set up
 
 ### 1. Database (once)
@@ -41,6 +52,25 @@ The database lives in the Supabase project `vanguard-docs` (Frankfurt).
    `supabase db push` with the Supabase CLI.
 2. In **Authentication → URL Configuration**, set **Site URL** to the app's address, for example
    `https://vanguard-docs.onrender.com`. Confirmation and password-reset emails link there.
+
+### 1b. Profiles and Copilot (once)
+
+1. Run `supabase/migrations/20261006090000_profiles_avatars.sql` the same way as step 1. Until you
+   do, the app works but profile pictures are off.
+2. Deploy the Copilot function and give it your Azure OpenAI details (Azure AI Foundry → your
+   resource → Keys and Endpoint, plus the name of your chat model deployment):
+
+```bash
+supabase secrets set \
+  AZURE_OPENAI_ENDPOINT=https://<resource>.openai.azure.com \
+  AZURE_OPENAI_API_KEY=<key> \
+  AZURE_OPENAI_DEPLOYMENT=<deployment name>
+supabase functions deploy copilot
+```
+
+   Optional: `AZURE_OPENAI_API_VERSION` (defaults to `2024-10-21`). The deployment needs a chat
+   model with function calling, such as gpt-4o or gpt-4.1. The key stays in Supabase and never
+   reaches the browser.
 
 ### 2. Hosting (free)
 
@@ -91,7 +121,8 @@ Open http://localhost:8000. It runs against the Supabase project in `web/config.
 ## Layout
 
 ```
-supabase/migrations/   Database schema, row-level security, Case File functions, storage bucket
+supabase/migrations/   Database schema, row-level security, Case File functions, storage buckets, profiles
+supabase/functions/    copilot: the Azure OpenAI agent (Deno edge function)
 web/                   The app: index.html, styles.css, app.js, config.js, PWA files, icons
 web/vendor/            supabase-js 2.117.2 (bundled so the app shell opens offline)
 render.yaml            Free static hosting with security headers

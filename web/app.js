@@ -16,7 +16,8 @@ const FILE_TYPES = { pdf:"application/pdf", png:"image/png", jpg:"image/jpeg", j
   xlsx:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   pptx:"application/vnd.openxmlformats-officedocument.presentationml.presentation" };
 const S = { vault:[], modules:[], docs:[], caseInfo:{enabled:false,unlocked:false,hours:8}, role:null, user:null,
-  view:"all", q:"", status:"", sort:"updated", openId:null, loaded:false, editDoc:null, editMod:null, authMode:"signin" };
+  view:"all", q:"", status:"", sort:"updated", openId:null, loaded:false, editDoc:null, editMod:null, authMode:"signin",
+  profiles:{}, avatarUrls:{}, noProfiles:false, cp:{ messages:[], busy:false, pending:null, err:"", open:false } };
 let installEvt = null;
 
 const $ = id => document.getElementById(id);
@@ -34,6 +35,18 @@ const findDoc = id => S.docs.find(x=>x.id===id) || S.vault.find(x=>x.id===id);
 const sClass = s => "s-" + String(s).replace(/\s/g,"");
 function toast(msg){ const t=$("toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,2800); }
 function notice(msg){ const n=$("notice"); n.textContent=msg; n.hidden=!msg; }
+const initials = n => (String(n||"").trim().split(/[\s@._-]+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("") || "?").toUpperCase();
+const nameOf = (uid, email) => S.profiles[uid]?.display_name || email || "";
+function avatar(uid, size=36, email=""){
+  const url = S.avatarUrls[uid];
+  return url ? `<span class="avatar" style="--s:${size}px"><img src="${esc(url)}" alt=""></span>`
+             : `<span class="avatar" style="--s:${size}px">${esc(initials(nameOf(uid, email)))}</span>`;
+}
+function paintMe(){
+  if (!S.user) return;
+  $("btn-me").innerHTML = avatar(S.user.id, 34, S.user.email);
+  $("m-who").textContent = `${nameOf(S.user.id, S.user.email)} · ${S.role||""}`;
+}
 
 /* ---------- data ---------- */
 function friendly(e){
@@ -63,11 +76,25 @@ async function load(){
   const all = docs.map(docOut);
   S.docs = all.filter(d => d.moduleId !== "case"); S.vault = all.filter(d => d.moduleId === "case");
   S.loaded = true;
+  if (!S.cp.messages.length) cpRestore();
+  loadProfiles();
   if (!["all","expiring","nofile"].includes(S.view) && !modById(S.view)) S.view = "all";
   if (S.view === "case" && !caseOpen()) S.view = "all";
   if (S.openId && !findDoc(S.openId)) S.openId = null;
   showApp();
   render();
+}
+async function loadProfiles(){
+  try {
+    const rows = await q(sb.from("profiles").select("*"));
+    S.noProfiles = false; S.profiles = Object.fromEntries(rows.map(r => [r.user_id, r])); S.avatarUrls = {};
+    const withPic = rows.filter(r => r.avatar_path);
+    if (withPic.length){
+      const signed = await q(sb.storage.from("avatars").createSignedUrls(withPic.map(r => r.avatar_path), 3600));
+      signed.forEach(x => { const r = withPic.find(v => v.avatar_path === x.path); if (r && x.signedUrl) S.avatarUrls[r.user_id] = x.signedUrl; });
+    }
+  } catch(x){ S.noProfiles = true; }   // profiles table not migrated yet: the app still works
+  paintMe();
 }
 const upsert = (list, d) => { const i = list.findIndex(x=>x.id===d.id); i<0 ? list.push(d) : list.splice(i,1,d); };
 function putDoc(d){ S.docs = S.docs.filter(x=>x.id!==d.id); S.vault = S.vault.filter(x=>x.id!==d.id); upsert(d.moduleId==="case"?S.vault:S.docs, d); }
@@ -80,7 +107,7 @@ function showApp(){
   const w = canWrite();
   $("btn-add").hidden = !w; $("btn-module").hidden = !w; $("m-import").hidden = !w;
   $("m-team").hidden = !isOwner(); $("m-lockcase").hidden = !caseOpen(); $("m-passcode").hidden = !(isOwner() && S.caseInfo.enabled);
-  $("m-who").textContent = `${S.user?.email || ""} · ${S.role}`;
+  paintMe();
   notice(S.role === "viewer" ? "You have view access. Ask an owner to make you an editor to file documents." : "");
 }
 function showPending(){
@@ -237,6 +264,8 @@ document.addEventListener("click", e => {
   if (!e.target.closest(".menu-wrap")) closeMenu();
   const v = e.target.closest("[data-view]");
   if (v){ const view=v.dataset.view; if (view==="case" && !caseOpen()) return openCaseDialog(S.caseInfo.enabled ? "unlock" : "setup"); S.view=view; render(); scrollTo({top:0}); return; }
+  const th = e.target.closest("[data-theme-id]"); if (th){ setTheme(th.dataset.themeId); return; }
+  const hint = e.target.closest("[data-hint]"); if (hint){ cpSend(hint.dataset.hint); return; }
   const st = e.target.closest("[data-stat]");
   if (st){ const k=st.dataset.stat; if(k==="expiring"){ if(S.view!=="case") S.view="expiring"; S.status=""; } else { S.status = k==="active"?"Active":k==="review"?"In review":""; } $("f-status").value=S.status; render(); return; }
   const row = e.target.closest("tr[data-doc]"); if (row){ S.openId=row.dataset.doc; renderDrawer(); return; }
@@ -254,7 +283,11 @@ document.addEventListener("click", e => {
   else if (act==="lockcase") lockCase();
   else if (act==="passcode"){ closeMenu(); openCaseDialog("change"); }
   else if (act==="team") openTeam();
-  else if (act==="theme") cycleTheme();
+  else if (act==="theme"){ closeMenu(); openThemes(); }
+  else if (act==="profile"){ closeMenu(); openProfile(); }
+  else if (act==="copilot"){ closeMenu(); cpOpen(true); }
+  else if (act==="cp-approve") cpDecide(true);
+  else if (act==="cp-reject") cpDecide(false);
   else if (act==="logout"){ closeMenu(); sb.auth.signOut(); }
   else if (act==="recheck") boot();
   else if (act==="install") installApp();
@@ -262,6 +295,7 @@ document.addEventListener("click", e => {
 document.addEventListener("keydown", e => {
   if (e.key==="Enter" && e.target.matches("tr[data-doc]")){ S.openId=e.target.dataset.doc; renderDrawer(); }
   if (e.key==="Escape" && S.openId && !document.querySelector("dialog[open]")){ S.openId=null; renderDrawer(); }
+  else if (e.key==="Escape" && S.cp.open && !document.querySelector("dialog[open]")) cpOpen(false);
 });
 let qT; $("q").addEventListener("input", e => { clearTimeout(qT); qT=setTimeout(()=>{ S.q=e.target.value.trim(); renderList(); },120); });
 $("f-status").addEventListener("change", e => { S.status=e.target.value; renderStats(); renderList(); });
@@ -478,7 +512,7 @@ async function openTeam(){
   try {
     const rows = await q(sb.from("members").select("*").order("created_at"));
     const roles = ["pending","viewer","editor","owner"];
-    $("team-list").innerHTML = rows.map(r => `<div class="row ${r.role==="pending"?"pend":""}"><div class="who">${esc(r.email)}<small>${r.user_id===S.user.id?"You":`Joined ${new Date(r.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}`}</small></div>
+    $("team-list").innerHTML = rows.map(r => `<div class="row ${r.role==="pending"?"pend":""}">${avatar(r.user_id, 34, r.email)}<div class="who">${esc(nameOf(r.user_id, r.email))}<small>${S.profiles[r.user_id]?.display_name ? esc(r.email)+" · " : ""}${r.user_id===S.user.id?"You":`Joined ${new Date(r.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}`}</small></div>
       <select data-member="${esc(r.user_id)}" aria-label="Role for ${esc(r.email)}" ${r.user_id===S.user.id?"disabled":""}>${roles.map(x=>`<option ${x===r.role?"selected":""}>${x}</option>`).join("")}</select></div>`).join("");
   } catch(x){ $("team-err").textContent = friendly(x); $("team-err").hidden = false; }
 }
@@ -536,19 +570,194 @@ $("import-file").addEventListener("change", async e => {
   } catch(x){ toast(friendly(x)); load().catch(()=>{}); }
 });
 
-/* ---------- theme + install ---------- */
-const THEMES = ["system","light","dark"];
+/* ---------- themes ---------- */
+// Ten themes. Each is a block of colour tokens in styles.css, switched by the data-theme attribute.
+const THEMES = [
+  { id:"auto",     name:"Auto",     note:"Follows your device", c:["#f3f4f2","#121715","#165d96"] },
+  { id:"daylight", name:"Daylight", note:"Clean and light",     c:["#f3f4f2","#ffffff","#165d96"] },
+  { id:"night",    name:"Night",    note:"Soft dark",           c:["#121715","#1a201d","#6aa8de"] },
+  { id:"midnight", name:"Midnight", note:"Deep navy",           c:["#0a1020","#111a30","#4cc9f0"] },
+  { id:"emerald",  name:"Emerald",  note:"Dark green",          c:["#0c1713","#122019","#34d399"] },
+  { id:"violet",   name:"Violet",   note:"Dark purple",         c:["#130f1f","#1c1530","#a78bfa"] },
+  { id:"sunset",   name:"Sunset",   note:"Warm light",          c:["#fbf3ec","#ffffff","#c2410c"] },
+  { id:"rose",     name:"Rose",     note:"Soft pink light",     c:["#fbf1f4","#ffffff","#be185d"] },
+  { id:"sand",     name:"Sand",     note:"Paper and olive",     c:["#f4f0e6","#fffdf7","#4d7c0f"] },
+  { id:"contrast", name:"Contrast", note:"Black and yellow",    c:["#000000","#0a0a0a","#ffd60a"] },
+];
+const LEGACY_THEME = { system:"auto", light:"daylight", dark:"night" };
+function savedTheme(){
+  let t = "auto"; try{ t = localStorage.getItem("vg-theme") || "auto"; }catch(e){}
+  t = LEGACY_THEME[t] || t;
+  return THEMES.some(x => x.id === t) ? t : "auto";
+}
 function applyTheme(t){
-  if (t==="system") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", t);
-  $("theme-name").textContent = t[0].toUpperCase()+t.slice(1);
+  const root = document.documentElement;
+  if (t === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", t);
+  document.querySelectorAll("meta[data-dyn]").forEach(m => m.remove());
+  if (t !== "auto"){
+    const m = document.createElement("meta"); m.name = "theme-color"; m.dataset.dyn = "1";
+    m.content = getComputedStyle(root).getPropertyValue("--panel").trim() || "#ffffff";
+    document.head.prepend(m);
+  }
+  $("theme-name").textContent = THEMES.find(x => x.id === t).name;
 }
-function cycleTheme(){
-  let cur="system"; try{ cur=localStorage.getItem("vg-theme")||"system"; }catch(e){}
-  const next = THEMES[(THEMES.indexOf(cur)+1)%THEMES.length];
-  try{ localStorage.setItem("vg-theme", next); }catch(e){}
-  applyTheme(next);
+function setTheme(t){
+  try{ localStorage.setItem("vg-theme", t); }catch(e){}
+  applyTheme(t); paintThemes();
 }
-try{ applyTheme(localStorage.getItem("vg-theme")||"system"); }catch(e){ applyTheme("system"); }
+function paintThemes(){
+  const cur = savedTheme();
+  $("theme-grid").innerHTML = THEMES.map(t => `<button type="button" class="theme" data-theme-id="${t.id}" aria-pressed="${t.id===cur}">
+    <span class="sw"><i style="background:${t.c[0]}"></i><i style="background:${t.c[1]}"></i><b style="background:${t.c[2]}"></b></span>
+    <span>${t.name}<small>${t.note}</small></span></button>`).join("");
+}
+function openThemes(){ paintThemes(); $("dlg-theme").showModal(); }
+applyTheme(savedTheme());
+
+/* ---------- profile ---------- */
+let pf = { blob:null, previewUrl:"", remove:false };
+function paintPf(){
+  const cur = S.avatarUrls[S.user.id];
+  const url = pf.previewUrl || (pf.remove ? "" : cur || "");
+  $("pf-avatar").innerHTML = url ? `<span class="avatar" style="--s:84px"><img src="${esc(url)}" alt=""></span>`
+    : `<span class="avatar" style="--s:84px">${esc(initials($("pf-name").value || S.user.email))}</span>`;
+  $("pf-remove").hidden = !url;
+}
+function openProfile(){
+  pf = { blob:null, previewUrl:"", remove:false };
+  $("pf-name").value = S.profiles[S.user.id]?.display_name || "";
+  $("pf-err").hidden = true; $("pf-save").disabled = false; $("pf-save").textContent = "Save profile";
+  $("pf-note").textContent = S.noProfiles ? "Profiles aren't switched on for this register yet. An owner needs to run the latest database migration." : "Pictures are cropped square and shrunk on your device before upload. Teammates with access to the register can see them.";
+  paintPf(); $("dlg-profile").showModal();
+}
+async function squareJpeg(file, size = 256){
+  if (!/^image\//.test(file.type) && !/\.(heic|jpe?g|png|webp)$/i.test(file.name)) throw new Error("Choose an image file.");
+  if (file.size > 15 * 1048576) throw new Error("That picture is over 15 MB. Choose a smaller one.");
+  let bmp; try { bmp = await createImageBitmap(file); } catch(e){ throw new Error("This browser can't read that picture format. Use a JPG or PNG."); }
+  const side = Math.min(bmp.width, bmp.height);
+  const c = document.createElement("canvas"); c.width = c.height = size;
+  c.getContext("2d").drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, size, size);
+  bmp.close?.();
+  return new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error("Couldn't process that picture.")), "image/jpeg", 0.86));
+}
+$("pf-file").addEventListener("change", async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  try {
+    pf.blob = await squareJpeg(f); pf.remove = false;
+    if (pf.previewUrl) URL.revokeObjectURL(pf.previewUrl);
+    pf.previewUrl = URL.createObjectURL(pf.blob); $("pf-err").hidden = true; paintPf();
+  } catch(x){ $("pf-err").textContent = x.message; $("pf-err").hidden = false; }
+});
+$("pf-remove").addEventListener("click", () => { pf.blob = null; pf.remove = true; if (pf.previewUrl) URL.revokeObjectURL(pf.previewUrl); pf.previewUrl = ""; paintPf(); });
+$("pf-name").addEventListener("input", () => { if (!pf.previewUrl && (pf.remove || !S.avatarUrls[S.user.id])) paintPf(); });
+$("pf-cancel").addEventListener("click", () => $("dlg-profile").close());
+$("btn-me").addEventListener("click", openProfile);
+$("form-profile").addEventListener("submit", async e => {
+  e.preventDefault();
+  const uid = S.user.id, prev = S.profiles[uid]?.avatar_path || "", name = $("pf-name").value.trim().slice(0, 60);
+  const err = msg => { $("pf-err").textContent = msg; $("pf-err").hidden = false; $("pf-save").disabled = false; $("pf-save").textContent = "Save profile"; };
+  $("pf-save").disabled = true; $("pf-save").textContent = "Saving…"; $("pf-err").hidden = true;
+  let path = prev, uploaded = "";
+  try {
+    if (pf.blob){
+      path = uploaded = `${uid}/${crypto.randomUUID()}.jpg`;
+      await q(sb.storage.from("avatars").upload(path, pf.blob, { contentType:"image/jpeg", upsert:false }));
+    } else if (pf.remove) path = "";
+    await q(sb.from("profiles").upsert({ user_id: uid, display_name: name, avatar_path: path }));
+    if (prev && prev !== path) sb.storage.from("avatars").remove([prev]).catch(() => {});
+    await loadProfiles();
+    if (pf.previewUrl) URL.revokeObjectURL(pf.previewUrl);
+    $("dlg-profile").close(); toast("Profile saved");
+  } catch(x){
+    if (uploaded) sb.storage.from("avatars").remove([uploaded]).catch(() => {});
+    err(S.noProfiles || /relation|schema cache|does not exist/i.test(x.message||"") ? "Profiles need the latest database migration. Ask an owner to run it." : friendly(x));
+  }
+});
+
+/* ---------- copilot ---------- */
+// The copilot is an Azure OpenAI tool-calling agent that runs in the `copilot` edge function, as
+// you. It reads freely; anything that changes the register comes back as a card you approve.
+const CP_HINTS = ["How is the register doing? What needs attention?", "What expires in the next 30 days?", "Set up a new company called Acme Trading with an NDA and an MSA", "Show everything still in Draft", "List my modules"];
+const CP_LOOK = { list_modules:"Checked the modules", search_documents:"Searched the register", get_document:"Opened a record", register_overview:"Reviewed the whole register" };
+const mdLite = t => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>");
+const parseJson = t => { try { return JSON.parse(t); } catch(e){ return null; } };
+const logoAv = '<span class="avatar logo"><img src="/logo.png" alt=""></span>';
+function doneText(r){
+  if (r.created === "company") return `Set up ${r.module.code} · ${r.module.name}${r.documents?.length ? `, filed ${r.documents.length} starter document${r.documents.length>1?"s":""}` : ""}${r.failed?.length ? `. Failed: ${r.failed.join("; ")}` : ""}`;
+  if (r.created === "module") return `Created module ${r.code} · ${r.name}`;
+  if (r.created === "document") return `Filed ${r.ref} · ${r.title}`;
+  if (r.updated_module) return `Updated module ${r.updated_module} · ${r.name}`;
+  if (typeof r.updated === "number") return `Changed ${r.updated} document${r.updated===1?"":"s"}${r.not_found?.length ? `. Not found: ${r.not_found.join(", ")}` : ""}`;
+  if (r.updated) return `Updated ${r.updated} · ${r.title}${r.note ? `. ${r.note}` : ""}`;
+  return "Done";
+}
+function cpRender(){
+  const c = S.cp, ms = c.messages, results = {};
+  ms.forEach(m => { if (m.role === "tool") results[m.tool_call_id] = parseJson(m.content); });
+  let h = "";
+  if (!ms.length) h = `<div class="cp-empty"><span class="avatar logo" style="--s:56px"><img src="/logo.png" alt=""></span><b>What should I handle?</b>
+    <span>I can search the register, set up companies and modules, file documents and update records. You approve every change.</span>
+    <div class="cp-chips">${CP_HINTS.map(t => `<button type="button" data-hint="${esc(t)}">${esc(t)}</button>`).join("")}</div></div>`;
+  for (const m of ms){
+    if (m.role === "user") h += `<div class="cp-msg user"><div class="bub">${esc(m.content)}</div></div>`;
+    else if (m.role === "assistant"){
+      if (m.content) h += `<div class="cp-msg">${logoAv}<div class="bub">${mdLite(m.content)}</div></div>`;
+      for (const tc of m.tool_calls || []){
+        const n = tc.function.name, r = results[tc.id];
+        if (CP_LOOK[n]) h += `<div class="cp-look">${CP_LOOK[n]}</div>`;
+        else if (r) h += r.rejected ? `<div class="cp-done no">Declined</div>` : r.error ? `<div class="cp-done no">${esc(r.error)}</div>` : `<div class="cp-done">${esc(doneText(r))}</div>`;
+      }
+    }
+  }
+  if (c.pending) h += `<div class="cp-ask"><b>Needs your approval</b><ul>${c.pending.map(p => `<li>${esc(p.summary)}</li>`).join("")}</ul>
+    <div class="row"><button class="btn primary" type="button" data-act="cp-approve">Approve</button><button class="btn" type="button" data-act="cp-reject">Decline</button></div></div>`;
+  if (c.busy) h += `<div class="cp-typing">Working…</div>`;
+  if (c.err) h += `<div class="cp-done no">${esc(c.err)}</div>`;
+  $("cp-log").innerHTML = h; $("cp-log").scrollTop = $("cp-log").scrollHeight;
+  $("cp-send").disabled = $("cp-input").disabled = c.busy || !!c.pending;
+}
+const CP_KEY = "vg-copilot";
+function cpSave(){ try{ sessionStorage.setItem(CP_KEY, JSON.stringify({ u:S.user?.id, m:S.cp.messages.slice(-40), p:S.cp.pending })); }catch(e){} }
+function cpRestore(){ try{ const j = JSON.parse(sessionStorage.getItem(CP_KEY)||"null"); if (j && j.u===S.user?.id && Array.isArray(j.m)){ S.cp.messages=j.m; S.cp.pending=j.p||null; } }catch(e){} }
+function cpOpen(on){
+  S.cp.open = on; $("cp").hidden = !on; $("cp-fab").hidden = on;
+  if (on){ cpRender(); setTimeout(() => { if (!$("cp-input").disabled) $("cp-input").focus(); }, 60); }
+}
+async function fnError(error){
+  try { const j = await error.context?.json?.(); if (j?.error) return new Error(j.error); } catch(e){}
+  return /Failed to send|fetch/i.test(error.message||"") ? new Error("Copilot isn't deployed yet, or you're offline. An owner needs to deploy the copilot function.") : error;
+}
+async function cpCall(decisions){
+  const c = S.cp; c.busy = true; c.pending = null; c.err = ""; cpRender();
+  try {
+    const { data, error } = await sb.functions.invoke("copilot", { body:{ messages:c.messages, decisions } });
+    if (error) throw await fnError(error);
+    if (data?.error) throw new Error(data.error);
+    c.messages = data.messages; c.pending = data.pending?.length ? data.pending : null; cpSave();
+    if (data.wrote) load().catch(() => {});
+  } catch(x){ c.err = friendly(x); }
+  c.busy = false; cpRender();
+}
+function cpSend(text){
+  const t = String(text || "").trim(); if (!t || S.cp.busy || S.cp.pending) return;
+  S.cp.messages.push({ role:"user", content:t }); cpSave(); $("cp-input").value = ""; $("cp-input").style.height = "";
+  cpCall({});
+}
+function cpDecide(yes){
+  const p = S.cp.pending; if (!p) return;
+  cpCall(Object.fromEntries(p.map(x => [x.id, yes ? "approve" : "reject"])));
+}
+$("cp-form").addEventListener("submit", e => { e.preventDefault(); cpSend($("cp-input").value); });
+$("cp-input").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); cpSend($("cp-input").value); } });
+$("cp-input").addEventListener("input", e => { e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"; });
+$("cp-fab").addEventListener("click", () => cpOpen(true));
+$("cp-close").addEventListener("click", () => cpOpen(false));
+$("cp-new").addEventListener("click", () => { if (S.cp.busy) return; S.cp.messages = []; S.cp.pending = null; S.cp.err = ""; cpSave(); cpRender(); });
+
+/* ---------- version ---------- */
+document.querySelectorAll(".ver").forEach(e => { e.textContent = `v${CFG.version} ${CFG.channel}`; });
+
+/* ---------- install ---------- */
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; $("m-install").hidden = false; });
 async function installApp(){ closeMenu(); if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice.catch(()=>{}); installEvt=null; $("m-install").hidden=true; }
 if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(()=>{}));
@@ -566,7 +775,7 @@ async function boot(){
 }
 sb.auth.onAuthStateChange((event, session) => {
   if (event === "PASSWORD_RECOVERY"){ recovering = true; S.user = session?.user || null; return showAuth("reset"); }
-  if (event === "SIGNED_OUT"){ Object.assign(S, { user:null, role:null, docs:[], vault:[], modules:[], loaded:false, openId:null, view:"all" }); renderDrawer(); return showAuth("signin"); }
+  if (event === "SIGNED_OUT"){ Object.assign(S, { user:null, role:null, docs:[], vault:[], modules:[], loaded:false, openId:null, view:"all", profiles:{}, avatarUrls:{}, cp:{ messages:[], busy:false, pending:null, err:"", open:false } }); cpOpen(false); try{ sessionStorage.removeItem("vg-copilot"); }catch(e){} renderDrawer(); return showAuth("signin"); }
   // Defer: supabase-js must not be called from inside this callback.
   if (event === "SIGNED_IN" && (!S.user || S.user.id !== session?.user?.id)){ S.user = session.user; setTimeout(() => !recovering && boot(), 0); }
 });
