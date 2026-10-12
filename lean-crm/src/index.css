@@ -1,0 +1,26 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
+}
+
+html, body, #root { height: 100%; }
+@layer base {
+  body { @apply bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100; }
+  input, textarea, select { @apply outline-none; }
+}
+@layer components {
+  .input { @apply w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-900; }
+  .btn { @apply inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm font-medium hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800; }
+  .btn-primary { @apply inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50; }
+  .btn-ghost { @apply inline-flex items-center gap-1 rounded px-1.5 py-1 text-xs font-medium text-zinc-500 hover:bg-zinc-200/70 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100; }
+  .card { @apply rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900; }
+  .kbd { @apply rounded border border-zinc-300 bg-zinc-100 px-1 font-mono text-[10px] text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800; }
+  .prose-sm h2 { @apply mt-4 mb-1 text-sm font-semibold first:mt-0; }
+  .prose-sm h3 { @apply mt-3 mb-1 text-sm font-semibold; }
+  .prose-sm p { @apply my-1.5; }
+  .prose-sm ul { @apply my-1.5 list-disc pl-5; }
+  .prose-sm ol { @apply my-1.5 list-decimal pl-5; }
+  .prose-sm a { @apply text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-400; }
+}
