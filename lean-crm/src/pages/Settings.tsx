@@ -103,10 +103,12 @@ function OwnerSettings() {
       <section className="card p-4">
         <h2 className="font-semibold">Claude API</h2>
         <p className="mb-3 text-sm text-zinc-500">
-          The key lives in <code className="kbd">.env</code> as <code className="kbd">ANTHROPIC_API_KEY</code> and never reaches the browser.
+          {me.hosted
+            ? 'Claude runs through the viewer’s claude.ai account. No API key needed.'
+            : <>The key lives in <code className="kbd">.env</code> as <code className="kbd">ANTHROPIC_API_KEY</code> and never reaches the browser.</>}
         </p>
         <div className="flex flex-wrap items-center gap-3">
-          <button className="btn" onClick={check} disabled={checking}>{checking ? 'Checking…' : 'Check API key'}</button>
+          <button className="btn" onClick={check} disabled={checking}>{checking ? 'Checking…' : me.hosted ? 'Check Claude' : 'Check API key'}</button>
           {status && (
             <span className={`text-sm ${status.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
               {status.ok ? '● ' : '○ '}{status.message}

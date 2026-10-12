@@ -130,7 +130,7 @@ agency.get('/users', h(() => {
 }));
 agency.post('/users/invite', async (req, res, next) => {
   try {
-    res.json(await invite(req, { email: String(req.body.email ?? ''), name: req.body.name, role: req.body.role, clientIds: Array.isArray(req.body.client_ids) ? req.body.client_ids : [] }));
+    res.json(await invite(req, { email: String(req.body.email ?? ''), name: req.body.name, role: req.body.role, clientIds: Array.isArray(req.body.client_ids) ? req.body.client_ids : [], claudeId: req.body.claude_id }));
   } catch (e) {
     next(e);
   }

@@ -172,6 +172,26 @@ npm run test:live   # real Claude calls: command bar, Research, next best action
 - Runs typecheck, tests and the production build on every push.
 - Runs the live Claude checks when the repository secret **`ANTHROPIC_API_KEY`** is set (Settings → Secrets and variables → Actions). The key stays in GitHub and is never printed.
 
+## Hosted on claude.ai
+
+`npm run build:hosted` builds the same app to run inside a claude.ai page (`hosted/dist`).
+
+The server code runs in the browser on SQLite. A few pieces are swapped for claude.ai equivalents:
+
+| Piece | Server version | claude.ai version |
+|---|---|---|
+| Data | `data/lean-crm.db` on your machine | The page's shared store, synced live between viewers |
+| Sign-in | Email and password | The claude.ai account. The page owner is the agency owner; add teammates by name under Settings → Team |
+| Claude | `ANTHROPIC_API_KEY` | The viewer's claude.ai account, no key needed |
+| Downloads | Normal browser downloads | claude.ai's download prompt |
+
+Differences to know:
+- **Research** can't search the live web there. It writes from Claude's own knowledge and says so on the brief.
+- **Weekly reports** are published to the client portal but can't be emailed.
+- **Data isolation is enforced by the page code, not by a server.** Anyone the page is shared with can technically read the whole store. For client logins that must be truly isolated, use the server version.
+
+`npx tsx hosted/export-seed.ts data/demo.db hosted/seed-out` exports a database as store documents for seeding.
+
 ## Production
 
 `npm run build && npm start` serves the app and API on one port (`PORT`, default 3001).

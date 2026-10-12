@@ -5,6 +5,7 @@ import { api, useQuery, write, toast, invalidateAll } from '../api';
 import type { Company, Contact } from '../types';
 import { Editable } from '../components/Editable';
 import { ago } from '../format';
+import { ask } from '../confirm';
 
 type Kind = 'contacts' | 'companies';
 type Col<T> = { key: keyof T & string; label: string; editable?: boolean; type?: 'email'; width?: string; list?: string; render?: (r: T) => React.ReactNode };
@@ -72,8 +73,8 @@ export function People() {
     ).then((r) => r && key === 'company' && invalidateAll());
   };
 
-  const remove = (id: number, name: string) => {
-    if (!confirm(`Delete ${name}? This also removes its timeline.`)) return;
+  const remove = async (id: number, name: string) => {
+    if (!(await ask(`Delete ${name}? This also removes its timeline.`, 'Delete'))) return;
     (query.mutate as (fn: (d: any[]) => any[]) => void)((d) => d.filter((r) => r.id !== id));
     write(api(`/${kind}/${id}`, { method: 'DELETE' }));
   };

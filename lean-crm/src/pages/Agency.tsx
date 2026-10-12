@@ -4,6 +4,7 @@ import { api, useQuery, toast, invalidateAll } from '../api';
 import { useSwitchClient, ClientLogo } from '../components/ClientSwitcher';
 import { Markdown } from '../components/Markdown';
 import { ago, money } from '../format';
+import { ask } from '../confirm';
 
 type Lb = { user_id: number; name: string; activities: number; calls: number; connected: number; connect_rate: number; meetings: number; score: number };
 type RollupRow = { id: number; name: string; logo_url: string; status: string; open_deals: number; open_value: number; created_deals: number; created_value: number; activities_week: number; meetings_week: number; connect_rate_week: number; last_activity: string | null };
@@ -221,11 +222,13 @@ function ReportEditor() {
     api(`/agency/reports/${id}`, { method: 'PATCH', body: { [k]: v } }).catch((e) => { toast(e.message, 'error'); reload(); });
   };
   const send = async () => {
-    if (!confirm(`Send this report to ${r.contact_email || '(no contact email)'}?`)) return;
+    if (!(await ask(`Send this report to ${r.contact_email || '(no contact email)'}?`, 'Send'))) return;
     setSending(true);
     try {
       const out = await api<{ delivered: boolean; file?: string; to: string }>(`/agency/reports/${id}/send`, { method: 'POST' });
-      toast(out.delivered ? `Sent to ${out.to}` : `Saved to the portal. Email written to ${out.file?.split('/data/')[1] ?? 'data/outbox'} (SMTP not set up).`);
+      toast(out.delivered ? `Sent to ${out.to}`
+        : out.file ? `Saved to the portal. Email written to ${out.file.split('/data/')[1] ?? 'data/outbox'} (SMTP not set up).`
+        : 'Published to the client portal. Email sending isn’t available in the hosted version.');
       reload();
       invalidateAll();
     } catch (e) {

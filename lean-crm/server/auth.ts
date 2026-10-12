@@ -89,7 +89,7 @@ export const allowRoles = (...roles: Role[]) => (req: Request, res: Response, ne
   roles.includes(req.scope.role) ? next() : res.status(403).json({ error: 'Not available for your account.' });
 
 // ---------- invites ----------
-export async function invite(req: Request, input: { email: string; name?: string; role: Role; clientIds: number[] }) {
+export async function invite(req: Request, input: { email: string; name?: string; role: Role; clientIds: number[]; claudeId?: string }) {
   const email = input.email.trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new UserError('Enter a valid email address.');
   if (!['owner', 'rep', 'client'].includes(input.role)) throw new UserError('Role must be owner, rep or client.');

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, Route, Routes, useNavigate } from 'react-router-dom';
 import { CommandBar } from './components/CommandBar';
 import { ClientSwitcher } from './components/ClientSwitcher';
-import { api, useToasts, dismissToast } from './api';
+import { api, useToasts, dismissToast, setPreviewUser, setActiveClient } from './api';
 import { useSession } from './session';
 import { Today } from './pages/Today';
 import { Pipeline } from './pages/Pipeline';
@@ -12,6 +12,7 @@ import { Settings } from './pages/Settings';
 import { Login, Invite } from './pages/Login';
 import { Agency } from './pages/Agency';
 import { Portal } from './pages/Portal';
+import { ConfirmHost } from './confirm';
 
 const BASE_NAV = [
   { to: '/', label: 'Today', key: 't', icon: '◎' },
@@ -50,6 +51,7 @@ function Toasts() {
 
 export function App() {
   const { me } = useSession();
+  if (me.agency && !me.user && me.hosted) return <NoAccess />;
   if (me.agency && !me.user) {
     return (
       <Routes>
@@ -62,8 +64,41 @@ export function App() {
   return <Main />;
 }
 
+function NoAccess() {
+  return (
+    <div className="grid min-h-full place-items-center p-6 text-center">
+      <div className="card max-w-sm p-6">
+        <p className="font-semibold">You don't have access yet</p>
+        <p className="mt-2 text-sm text-zinc-500">Ask the agency owner to add your email under Settings → Team, then reopen this page.</p>
+      </div>
+    </div>
+  );
+}
+
+/** Hosted version: the owner can look at the app as an SDR or a client. */
+function PreviewAs({ className = '' }: { className?: string }) {
+  const { me, reload } = useSession();
+  if (!me.hosted || !me.agency || (!me.previewable?.length && !me.previewing)) return null;
+  const pick = async (id: number | null) => { setPreviewUser(id); setActiveClient(null); await reload(); };
+  if (me.previewing) {
+    return (
+      <div className={`flex items-center justify-between gap-2 rounded-md bg-amber-100 px-2.5 py-1.5 text-xs text-amber-900 dark:bg-amber-900/60 dark:text-amber-100 ${className}`}>
+        <span className="truncate">Previewing as {me.user?.name}</span>
+        <button className="font-semibold underline" onClick={() => pick(null)}>Exit</button>
+      </div>
+    );
+  }
+  return (
+    <select className={`input py-1 text-xs ${className}`} value="" onChange={(e) => pick(Number(e.target.value))} aria-label="Preview as">
+      <option value="">Preview as…</option>
+      {me.previewable!.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role === 'rep' ? 'SDR' : 'client'})</option>)}
+    </select>
+  );
+}
+
 function SignOut({ className = '' }: { className?: string }) {
-  const { reload } = useSession();
+  const { me, reload } = useSession();
+  if (me.hosted) return null;
   return <button className={className} onClick={async () => { await api('/auth/logout', { method: 'POST' }).catch(() => {}); await reload(); }}>Sign out</button>;
 }
 
@@ -75,12 +110,14 @@ function ClientShell() {
       <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-2.5 dark:border-zinc-800 dark:bg-zinc-900">
         <span className="flex items-center gap-2 text-sm font-semibold"><span className="grid h-6 w-6 place-items-center rounded bg-indigo-600 text-xs text-white">L</span>Client portal</span>
         <div className="flex items-center gap-1">
+          <PreviewAs />
           <button onClick={toggleTheme} className="btn-ghost text-base" aria-label="Toggle theme">{dark ? '☀' : '☾'}</button>
           <SignOut className="btn-ghost" />
         </div>
       </header>
       <Portal />
       <Toasts />
+      <ConfirmHost />
     </div>
   );
 }
@@ -138,6 +175,7 @@ function Main() {
           ))}
         </nav>
         <div className="mt-auto space-y-1">
+          <PreviewAs className="mb-2" />
           {agency && <p className="truncate px-2.5 text-xs text-zinc-400" title={me.user?.email}>{me.user?.name} · {me.user?.role === 'rep' ? 'SDR' : 'Owner'}</p>}
           <button onClick={toggleTheme} className="btn-ghost w-full justify-start px-2.5 py-1.5 text-sm">{dark ? '☀ Light mode' : '☾ Dark mode'}</button>
           {agency && <SignOut className="btn-ghost w-full justify-start px-2.5 py-1.5 text-sm" />}
@@ -176,6 +214,7 @@ function Main() {
 
       <CommandBar open={cmdOpen} onClose={() => setCmdOpen(false)} />
       <Toasts />
+      <ConfirmHost />
     </div>
   );
 }

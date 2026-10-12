@@ -3,12 +3,53 @@ import { api, useQuery, write, toast } from '../api';
 import { useSession } from '../session';
 import { Editable } from '../components/Editable';
 import type { Client, Role } from '../types';
+import { ask } from '../confirm';
 
 type TeamUser = { id: number; email: string; name: string; role: Role; pending: boolean; client_ids: number[] };
+type Person = { id: string; name: string; avatarUrl: string };
+
+/** Hosted version: find a claude.ai account in your organization by name. */
+function PersonPicker({ value, onChange }: { value: Person | null; onChange: (p: Person | null) => void }) {
+  const [q, setQ] = useState('');
+  const [hits, setHits] = useState<Person[]>([]);
+  const [open, setOpen] = useState(false);
+  const find = async (text: string) => {
+    setQ(text);
+    setOpen(true);
+    setHits(await api<Person[]>(`/agency/people?q=${encodeURIComponent(text)}`).catch(() => []));
+  };
+  if (value) {
+    return (
+      <span className="flex min-w-52 flex-1 items-center gap-2 rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700">
+        <img src={value.avatarUrl} alt="" className="h-5 w-5 rounded-full" />
+        <span className="flex-1 truncate">{value.name}</span>
+        <button type="button" className="btn-ghost" onClick={() => onChange(null)} aria-label="Clear">✕</button>
+      </span>
+    );
+  }
+  return (
+    <div className="relative min-w-52 flex-1">
+      <input className="input" placeholder="Search people by name" value={q} onFocus={() => find(q)} onChange={(e) => find(e.target.value)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)} aria-label="Search people" />
+      {open && !!hits.length && (
+        <ul className="absolute z-20 mt-1 w-full rounded-md border border-zinc-200 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+          {hits.map((p) => (
+            <li key={p.id}>
+              <button type="button" className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                onMouseDown={(e) => e.preventDefault()} onClick={() => { onChange(p); setOpen(false); setQ(''); }}>
+                <img src={p.avatarUrl} alt="" className="h-5 w-5 rounded-full" />{p.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 /** Shown in single-user mode. Turning Agency Mode on creates the owner login. */
 export function EnableAgency() {
-  const { reload } = useSession();
+  const { me, reload } = useSession();
   const [open, setOpen] = useState(false);
   const [f, setF] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
@@ -30,7 +71,11 @@ export function EnableAgency() {
           <h2 className="font-semibold">Agency Mode</h2>
           <p className="text-sm text-zinc-500">For outbound agencies running several clients: client workspaces, SDR logins, activity scores, weekly client reports and a client portal.</p>
         </div>
-        <button role="switch" aria-checked={false} onClick={() => setOpen((o) => !o)} className="relative h-6 w-11 shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-700" aria-label="Turn on Agency Mode">
+        <button role="switch" aria-checked={false} onClick={async () => {
+          if (!me.hosted) return setOpen((o) => !o);
+          if (!(await ask('Turn on Agency Mode? Your existing data moves into “My workspace”. People get access when you add their claude.ai email under Team.', 'Turn on'))) return;
+          try { await api('/auth/enable', { method: 'POST', body: {} }); await reload(); } catch (err) { toast((err as Error).message, 'error'); }
+        }} className="relative h-6 w-11 shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-700" aria-label="Turn on Agency Mode">
           <span className="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow" />
         </button>
       </div>
@@ -56,7 +101,7 @@ export function AgencySettings() {
   const zones = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.('timeZone') ?? ['Asia/Beirut', 'UTC'];
 
   const disable = async () => {
-    if (!confirm('Turn off Agency Mode? Logins stop being required and only “My workspace” stays visible. Other client workspaces are kept and come back when you turn it on again.')) return;
+    if (!(await ask('Turn off Agency Mode? Logins stop being required and only “My workspace” stays visible. Other client workspaces are kept and come back when you turn it on again.', 'Turn off'))) return;
     await write(api('/agency/disable', { method: 'POST' }));
     await reload();
   };
@@ -142,17 +187,20 @@ function Team() {
   const { me } = useSession();
   const users = useQuery<TeamUser[]>('/agency/users');
   const clients = useQuery<Client[]>('/agency/clients');
-  const [f, setF] = useState<{ email: string; role: Role; client_ids: number[] }>({ email: '', role: 'rep', client_ids: [] });
+  const [f, setF] = useState<{ email: string; role: Role; client_ids: number[]; person?: Person | null }>({ email: '', role: 'rep', client_ids: [] });
   const [link, setLink] = useState<string | null>(null);
   const name = (id: number) => clients.data?.find((c) => c.id === id)?.name ?? `#${id}`;
 
   const invite = async (e: React.FormEvent) => {
     e.preventDefault();
-    const r = await write(api<{ link: string; emailed: boolean }>('/agency/users/invite', { method: 'POST', body: f }));
+    if (me.hosted && !f.person) return toast('Pick a person from the search results.', 'error');
+    const body = me.hosted ? { role: f.role, client_ids: f.client_ids, claude_id: f.person!.id, name: f.person!.name } : f;
+    const r = await write(api<{ link?: string; emailed: boolean; hosted?: boolean }>('/agency/users/invite', { method: 'POST', body }));
     if (!r) return;
-    toast(r.emailed ? `Invite emailed to ${f.email}` : 'Invite created. Email isn’t set up, so copy the link below.');
-    setLink(r.emailed ? null : r.link);
-    setF({ email: '', role: f.role, client_ids: [] });
+    toast(r.hosted ? `Added ${f.person?.name}. Share this page with them in claude.ai; they get access when they open it.`
+      : r.emailed ? `Invite emailed to ${f.email}` : 'Invite created. Email isn’t set up, so copy the link below.');
+    setLink(r.emailed || !r.link ? null : r.link);
+    setF({ email: '', role: f.role, client_ids: [], person: null });
     users.reload();
   };
   const toggleAssign = (u: TeamUser, cid: number) => {
@@ -160,8 +208,8 @@ function Team() {
     users.mutate((l) => l.map((x) => (x.id === u.id ? { ...x, client_ids: ids } : x)));
     write(api(`/agency/users/${u.id}`, { method: 'PATCH', body: { client_ids: ids } }), () => users.reload());
   };
-  const remove = (u: TeamUser) => {
-    if (!confirm(`Remove ${u.name || u.email}? They lose access immediately.`)) return;
+  const remove = async (u: TeamUser) => {
+    if (!(await ask(`Remove ${u.name || u.email}? They lose access immediately.`, 'Remove'))) return;
     users.mutate((l) => l.filter((x) => x.id !== u.id));
     write(api(`/agency/users/${u.id}`, { method: 'DELETE' }));
   };
@@ -176,7 +224,7 @@ function Team() {
           <li key={u.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium">{u.name || u.email} {u.pending && <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] font-medium text-amber-800 dark:bg-amber-900/60 dark:text-amber-200">invited</span>}</p>
-              <p className="truncate text-xs text-zinc-500">{u.email} · {roleLabel[u.role]}{u.role === 'client' ? ` · ${name(u.client_ids[0])}` : ''}</p>
+              <p className="truncate text-xs text-zinc-500">{u.email.startsWith('claude:') ? 'claude.ai account' : u.email} · {roleLabel[u.role]}{u.role === 'client' ? ` · ${name(u.client_ids[0])}` : ''}</p>
             </div>
             {u.role === 'rep' && (
               <div className="flex flex-wrap gap-1">
@@ -193,13 +241,15 @@ function Team() {
         ))}
       </ul>
       <form onSubmit={invite} className="mt-3 space-y-2 border-t border-zinc-200 pt-3 dark:border-zinc-800">
-        <p className="text-sm font-medium">Invite by email</p>
+        <p className="text-sm font-medium">{me.hosted ? 'Add a person' : 'Invite by email'}</p>
         <div className="flex flex-wrap gap-2">
-          <input className="input min-w-52 flex-1" type="email" placeholder="name@company.com" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} required />
+          {me.hosted
+            ? <PersonPicker value={f.person ?? null} onChange={(person) => setF({ ...f, person })} />
+            : <input className="input min-w-52 flex-1" type="email" placeholder="name@company.com" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} required />}
           <select className="input w-auto" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as Role, client_ids: [] })} aria-label="Role">
             <option value="rep">SDR</option><option value="client">Client</option><option value="owner">Owner</option>
           </select>
-          <button className="btn-primary">Send invite</button>
+          <button className="btn-primary">{me.hosted ? 'Add' : 'Send invite'}</button>
         </div>
         {f.role !== 'owner' && (
           <div className="flex flex-wrap items-center gap-1 text-xs">

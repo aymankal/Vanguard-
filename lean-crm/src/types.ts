@@ -21,5 +21,12 @@ export type Applied = { kind: 'contact' | 'company' | 'deal' | 'task' | 'note'; 
 export type Role = 'owner' | 'rep' | 'client';
 export type Client = { id: number; name: string; logo_url: string; status: 'active' | 'paused' | 'ended'; contact_email?: string; start_date?: string | null };
 export type User = { id: number; email: string; name: string; role: Role; client_id: number | null };
-export type Me = { agency: boolean; user: User | null; clients: Client[] };
+export type Me = {
+  agency: boolean; user: User | null; clients: Client[];
+  /** Hosted on claude.ai: identity comes from the claude.ai account, no passwords. */
+  hosted?: boolean;
+  /** Hosted, owner only: people the owner can preview the app as. */
+  previewable?: { id: number; name: string; role: Role }[];
+  previewing?: boolean;
+};
 export type MeetingStatus = 'booked' | 'held' | 'no_show' | 'cancelled';

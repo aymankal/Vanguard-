@@ -11,9 +11,17 @@ export function setActiveClient(id: number | null) {
   cache.clear();
   invalidateAll();
 }
+let previewUser: number | null = null;
+/** Hosted version only: the owner previews the app as another person. */
+export function setPreviewUser(id: number | null) {
+  previewUser = id;
+  try { id ? sessionStorage.setItem('lc_preview', String(id)) : sessionStorage.removeItem('lc_preview'); } catch { /* storage blocked */ }
+}
+try { previewUser = Number(sessionStorage.getItem('lc_preview')) || null; } catch { /* storage blocked */ }
 const headers = (json: boolean): Record<string, string> => ({
   ...(json ? { 'Content-Type': 'application/json' } : {}),
   ...(activeClient ? { 'X-Client-Id': String(activeClient) } : {}),
+  ...(previewUser ? { 'X-Preview-User': String(previewUser) } : {}),
 });
 /** Fired when the session expires so the app can show the sign-in page. */
 const signedOut = () => window.dispatchEvent(new Event('lc:signed-out'));

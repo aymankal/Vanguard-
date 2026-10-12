@@ -56,6 +56,13 @@ export function CommandBar({ open, onClose }: { open: boolean; onClose: () => vo
     if (open) setTimeout(() => inputRef.current?.focus(), 0);
   }, [open]);
   useEffect(() => endRef.current?.scrollIntoView({ block: 'end' }), [turns]);
+  // Escape closes the bar wherever focus is (e.g. after the Confirm button disappears).
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !e.defaultPrevented && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
 
   const update = (i: number, fn: (t: Turn) => Turn) => setTurns((ts) => ts.map((t, j) => (j === i ? fn(t) : t)));
 

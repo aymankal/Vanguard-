@@ -8,6 +8,7 @@ import { TaskRow } from '../components/TaskRow';
 import { ResearchPanel, NextBestAction } from '../components/AiPanels';
 import { QuickLog } from '../components/QuickLog';
 import { useSession } from '../session';
+import { ask } from '../confirm';
 import type { MeetingStatus } from '../types';
 import { ago, fmtDate, money, todayStr, addDays } from '../format';
 
@@ -39,7 +40,7 @@ export function RecordPage() {
 
   const remove = async () => {
     const label = 'name' in rec ? rec.name : rec.title;
-    if (!confirm(`Delete ${label}? This can't be undone.`)) return;
+    if (!(await ask(`Delete ${label}? This can't be undone.`, 'Delete'))) return;
     await write(api(`/${kind}/${id}`, { method: 'DELETE' }));
     invalidateAll();
     navigate(kind === 'deals' ? '/pipeline' : kind === 'companies' ? '/contacts?tab=companies' : '/contacts');
