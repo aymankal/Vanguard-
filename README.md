@@ -1,5 +1,7 @@
 # Vanguard Docs (v0.9.0 beta)
 
+> Also in this repo: **[Lean CRM](lean-crm/README.md)**, a minimal AI-assisted CRM (`lean-crm/`).
+
 <img src="web/logo.png" alt="Vanguard" width="72" />
 
 Document control for Vanguard Services, built as an app you install on your phone. It holds
