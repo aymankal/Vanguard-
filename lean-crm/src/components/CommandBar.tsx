@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { api, stream, invalidateAll, toast } from '../api';
 import type { Action, Applied } from '../types';
 import { Markdown } from './Markdown';
+import { ClientLogo, useSwitchClient } from './ClientSwitcher';
+import { useSession } from '../session';
 
 type Turn = {
   role: 'user' | 'assistant';
@@ -31,6 +33,24 @@ export function CommandBar({ open, onClose }: { open: boolean; onClose: () => vo
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const { me, client } = useSession();
+  const switchTo = useSwitchClient();
+  const [hi, setHi] = useState(-1);
+
+  // Agency Mode: typing a client name offers to switch workspaces (↓ then ↵, or "switch to <name>").
+  const q = input.trim().toLowerCase().replace(/^(switch|go)( to)?\s+/, '');
+  const clientMatches = me.agency
+    ? [...(me.user?.role === 'owner' ? [{ id: 'all' as const, name: 'All clients', logo_url: '' }] : []), ...me.clients]
+        .filter((c) => (q ? c.name.toLowerCase().includes(q) : !turns.length))
+        .slice(0, 6)
+    : [];
+  const doSwitch = (id: number | 'all') => {
+    switchTo(id);
+    setInput('');
+    setHi(-1);
+    setTurns([]);
+    onClose();
+  };
 
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 0);
@@ -107,6 +127,21 @@ export function CommandBar({ open, onClose }: { open: boolean; onClose: () => vo
   const pendingIdx = turns.findLastIndex((t) => t.outcome === 'pending' && !t.streaming);
 
   function onKeyDown(e: React.KeyboardEvent) {
+    if (clientMatches.length && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      e.preventDefault();
+      setHi((h) => (e.key === 'ArrowDown' ? Math.min(h + 1, clientMatches.length - 1) : Math.max(h - 1, -1)));
+      return;
+    }
+    if (e.key === 'Enter' && !e.shiftKey && hi >= 0 && clientMatches[hi]) {
+      e.preventDefault();
+      doSwitch(clientMatches[hi].id);
+      return;
+    }
+    if (e.key === 'Enter' && !e.shiftKey && /^(switch|go)\b/i.test(input.trim()) && clientMatches.length === 1) {
+      e.preventDefault();
+      doSwitch(clientMatches[0].id);
+      return;
+    }
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && pendingIdx >= 0) {
       e.preventDefault();
       confirm(pendingIdx);
@@ -134,9 +169,9 @@ export function CommandBar({ open, onClose }: { open: boolean; onClose: () => vo
             ref={inputRef}
             rows={1}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => { setInput(e.target.value); setHi(-1); }}
             onKeyDown={onKeyDown}
-            placeholder="Tell me what to add, or ask about your pipeline…"
+            placeholder={me.agency ? `Ask or command in ${client?.name ?? 'this client'}, or type a client name…` : 'Tell me what to add, or ask about your pipeline…'}
             className="max-h-32 min-h-[2rem] flex-1 resize-none bg-transparent py-1 text-base"
           />
           {busy ? (
@@ -147,7 +182,20 @@ export function CommandBar({ open, onClose }: { open: boolean; onClose: () => vo
         </div>
 
         <div className="flex-1 overflow-y-auto p-3">
-          {!turns.length && (
+          {!!clientMatches.length && (
+            <div className="mb-3 space-y-0.5" role="listbox" aria-label="Switch client">
+              <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-zinc-400">Switch client <span className="font-normal normal-case">↓ ↵</span></p>
+              {clientMatches.map((c, i) => (
+                <button key={c.id} role="option" aria-selected={i === hi} onMouseEnter={() => setHi(i)} onClick={() => doSwitch(c.id)}
+                  className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm ${i === hi ? 'bg-indigo-50 text-indigo-900 dark:bg-indigo-950 dark:text-indigo-100' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}>
+                  {c.id === 'all' ? <span className="grid h-5 w-5 place-items-center rounded bg-indigo-600 text-[10px] text-white">∗</span> : <ClientLogo client={c} size={5} />}
+                  {c.name}
+                  {c.id === client?.id && <span className="ml-auto text-xs text-zinc-400">current</span>}
+                </button>
+              ))}
+            </div>
+          )}
+          {!turns.length && !q && (
             <div className="space-y-1">
               <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-zinc-400">Try</p>
               {EXAMPLES.map((ex) => (

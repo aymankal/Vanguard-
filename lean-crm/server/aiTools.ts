@@ -2,8 +2,10 @@
 // proposals that the user must confirm before anything is committed.
 import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
-import { db, DEAL_SELECT, CONTACT_SELECT, COMPANY_SELECT, CLOSED_STAGE_NAMES, type Row } from './db.js';
+import { db, type Row } from './db.js';
+import * as repo from './repo.js';
 import * as store from './store.js';
+import type { Scope } from './scope.js';
 
 const opt = z.string().trim().optional().nullable();
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'use YYYY-MM-DD').optional().nullable();
@@ -107,42 +109,40 @@ export const isWriteTool = (name: string): name is WriteTool => name in writeSch
 
 // ---------- Apply (the only path that commits AI-proposed changes) ----------
 
-function findDeal(ref: string): number {
-  const exact = db.prepare('SELECT id FROM deals WHERE lower(title) = lower(?)').all(ref) as Row[];
-  if (exact.length === 1) return exact[0].id as number;
-  const like = db.prepare('SELECT id, title FROM deals WHERE title LIKE ?').all(`%${ref}%`) as Row[];
-  if (like.length === 1) return like[0].id as number;
-  if (!like.length) throw new store.UserError(`No deal matching "${ref}".`);
-  throw new store.UserError(`"${ref}" matches several deals: ${like.map((d) => d.title).join('; ')}. Be more specific.`);
+function findDeal(s: Scope, ref: string): number {
+  const rows = repo.dealsByTitle(s, ref);
+  if (rows.length === 1) return rows[0].id as number;
+  if (!rows.length) throw new store.UserError(`No deal matching "${ref}".`);
+  throw new store.UserError(`"${ref}" matches several deals: ${rows.map((d) => d.title).join('; ')}. Be more specific.`);
 }
 
 export type Applied = { kind: 'contact' | 'company' | 'deal' | 'task' | 'note'; id: number; label: string };
 
-function applyOne(a: { tool: WriteTool; input: Row }): Applied {
+function applyOne(s: Scope, a: { tool: WriteTool; input: Row }): Applied {
   const i = writeSchemas[a.tool].parse(a.input) as Row;
   switch (a.tool) {
     case 'create_company':
-      return { kind: 'company', id: store.createCompany(i), label: String(i.name) };
+      return { kind: 'company', id: store.createCompany(s, i), label: String(i.name) };
     case 'create_contact':
-      return { kind: 'contact', id: store.createContact(i), label: String(i.name) };
+      return { kind: 'contact', id: store.createContact(s, i), label: String(i.name) };
     case 'create_deal':
-      return { kind: 'deal', id: store.createDeal(i), label: String(i.title) };
+      return { kind: 'deal', id: store.createDeal(s, i), label: String(i.title) };
     case 'update_deal_stage': {
-      const id = findDeal(String(i.deal));
-      store.setDealStage(id, store.resolveStage(i.stage));
+      const id = findDeal(s, String(i.deal));
+      store.setDealStage(s, id, store.resolveStage(i.stage));
       return { kind: 'deal', id, label: `${i.deal} → ${i.stage}` };
     }
     case 'create_task': {
-      const deal_id = i.deal ? findDeal(String(i.deal)) : null;
-      const contact_id = i.contact ? store.resolveContact(i.contact) : null;
-      return { kind: 'task', id: store.createTask({ ...i, deal_id, contact_id }), label: String(i.title) };
+      const deal_id = i.deal ? findDeal(s, String(i.deal)) : null;
+      const contact_id = i.contact ? store.resolveContact(s, i.contact) : null;
+      return { kind: 'task', id: store.createTask(s, { ...i, deal_id, contact_id }), label: String(i.title) };
     }
     case 'log_note': {
-      const deal_id = i.deal ? findDeal(String(i.deal)) : null;
-      const contact_id = i.contact ? store.resolveContact(i.contact) : null;
-      const company_id = i.company ? store.resolveCompany(i.company, false) : null;
+      const deal_id = i.deal ? findDeal(s, String(i.deal)) : null;
+      const contact_id = i.contact ? store.resolveContact(s, i.contact) : null;
+      const company_id = i.company ? store.resolveCompany(s, i.company, false) : null;
       if (i.company && !company_id) throw new store.UserError(`No company named "${i.company}".`);
-      const id = store.addActivity({ type: i.type ?? 'note', body: i.body, deal_id, contact_id, company_id });
+      const id = store.addActivity(s, { type: i.type ?? 'note', body: i.body, deal_id, contact_id, company_id });
       const target = deal_id ? { kind: 'deal' as const, id: deal_id } : contact_id ? { kind: 'contact' as const, id: contact_id } : { kind: 'company' as const, id: company_id! };
       return { ...target, label: `Note logged (#${id})` };
     }
@@ -150,8 +150,8 @@ function applyOne(a: { tool: WriteTool; input: Row }): Applied {
 }
 
 /** Commit confirmed actions atomically. */
-export function applyActions(actions: { tool: WriteTool; input: Row }[]): Applied[] {
-  return db.transaction(() => actions.map(applyOne))();
+export function applyActions(s: Scope, actions: { tool: WriteTool; input: Row }[]): Applied[] {
+  return db.transaction(() => actions.map((a) => applyOne(s, a)))();
 }
 
 class Rollback extends Error {}
@@ -159,10 +159,10 @@ class Rollback extends Error {}
  * Validate a proposal against the live data plus earlier proposals by running them inside a
  * transaction that is always rolled back. Nothing is ever committed here.
  */
-export function dryRun(actions: { tool: WriteTool; input: Row }[]): string | null {
+export function dryRun(s: Scope, actions: { tool: WriteTool; input: Row }[]): string | null {
   try {
     db.transaction(() => {
-      actions.forEach(applyOne);
+      actions.forEach((a) => applyOne(s, a));
       throw new Rollback();
     })();
   } catch (e) {
@@ -186,71 +186,9 @@ export function summarize(tool: WriteTool, i: Row): string {
   }
 }
 
-// ---------- Read tools ----------
-const closed = CLOSED_STAGE_NAMES.map((n) => `'${n}'`).join(',');
-
-export function runReadTool(name: string, input: unknown): string {
-  if (name === 'search_records') return JSON.stringify(search(readSchemas.search_records.parse(input)));
-  if (name === 'summarize_account') return JSON.stringify(account(readSchemas.summarize_account.parse(input)));
+// ---------- Read tools (scoped) ----------
+export function runReadTool(s: Scope, name: string, input: unknown): string {
+  if (name === 'search_records') return JSON.stringify(repo.searchRecords(s, readSchemas.search_records.parse(input)));
+  if (name === 'summarize_account') return JSON.stringify(repo.accountSummary(s, readSchemas.summarize_account.parse(input)));
   throw new store.UserError(`Unknown tool ${name}`);
-}
-
-function search(f: z.infer<typeof readSchemas.search_records>) {
-  const where: string[] = [];
-  const args: unknown[] = [];
-  const q = f.query ? `%${f.query}%` : null;
-  const add = (cond: string, ...a: unknown[]) => (where.push(cond), args.push(...a));
-  const W = () => (where.length ? `WHERE ${where.join(' AND ')}` : '');
-  const stale = (days: number) => `datetime('now', '-${days} days')`;
-
-  if (f.type === 'contacts') {
-    if (q) add('(name LIKE ? OR email LIKE ? OR company LIKE ? OR title LIKE ?)', q, q, q, q);
-    if (f.inactive_days) add(`(last_activity IS NULL OR last_activity < ${stale(f.inactive_days)})`);
-    return db.prepare(`SELECT id, name, email, phone, title, company, owner, last_activity FROM (${CONTACT_SELECT}) ${W()} ORDER BY last_activity LIMIT 50`).all(...args);
-  }
-  if (f.type === 'companies') {
-    if (q) add('(name LIKE ? OR industry LIKE ? OR notes LIKE ?)', q, q, q);
-    return db.prepare(`SELECT id, name, website, industry, size, notes, contact_count FROM (${COMPANY_SELECT}) ${W()} ORDER BY name LIMIT 50`).all(...args);
-  }
-  if (f.type === 'deals') {
-    if (q) add('(title LIKE ? OR company LIKE ? OR contact LIKE ?)', q, q, q);
-    if (f.stage) add('lower(stage) = lower(?)', f.stage);
-    if (f.close_from) add('close_date >= ?', f.close_from);
-    if (f.close_to) add('close_date <= ?', f.close_to);
-    if (f.open_only) add(`lower(stage) NOT IN (${closed})`);
-    if (f.inactive_days) add(`last_activity < ${stale(f.inactive_days)}`);
-    return db.prepare(`SELECT id, title, value, stage, company, contact, close_date, last_activity FROM (${DEAL_SELECT}) ${W()} ORDER BY close_date LIMIT 50`).all(...args);
-  }
-  if (!f.include_done) add('t.done = 0');
-  if (q) add('(t.title LIKE ? OR c.name LIKE ? OR d.title LIKE ?)', q, q, q);
-  if (f.due_from) add('t.due_date >= ?', f.due_from);
-  if (f.due_to) add('t.due_date <= ?', f.due_to);
-  return db.prepare(`SELECT t.id, t.title, t.due_date, t.done, c.name AS contact, d.title AS deal FROM tasks t
-    LEFT JOIN contacts c ON c.id = t.contact_id LEFT JOIN deals d ON d.id = t.deal_id ${W()} ORDER BY t.due_date LIMIT 50`).all(...args);
-}
-
-function account(f: z.infer<typeof readSchemas.summarize_account>) {
-  if (f.company) {
-    const co = db.prepare(`${COMPANY_SELECT} WHERE co.name LIKE ? LIMIT 1`).get(`%${f.company}%`) as Row | undefined;
-    if (!co) return { error: `No company matching "${f.company}"` };
-    return {
-      company: co,
-      contacts: db.prepare(`SELECT name, title, email, last_activity FROM (${CONTACT_SELECT}) WHERE company_id = ?`).all(co.id),
-      deals: db.prepare(`SELECT title, value, stage, contact, close_date, last_activity FROM (${DEAL_SELECT}) WHERE company_id = ?`).all(co.id),
-      open_tasks: db.prepare(`SELECT t.title, t.due_date FROM tasks t LEFT JOIN contacts c ON c.id = t.contact_id LEFT JOIN deals d ON d.id = t.deal_id
-                              WHERE t.done = 0 AND (c.company_id = ? OR d.company_id = ?)`).all(co.id, co.id),
-      timeline: db.prepare('SELECT type, body, created_at FROM activities WHERE company_id = ? ORDER BY created_at DESC LIMIT 25').all(co.id),
-    };
-  }
-  if (f.contact) {
-    const ct = db.prepare(`${CONTACT_SELECT} WHERE c.name LIKE ? LIMIT 1`).get(`%${f.contact}%`) as Row | undefined;
-    if (!ct) return { error: `No contact matching "${f.contact}"` };
-    return {
-      contact: ct,
-      deals: db.prepare(`SELECT title, value, stage, close_date, last_activity FROM (${DEAL_SELECT}) WHERE contact_id = ?`).all(ct.id),
-      open_tasks: db.prepare('SELECT title, due_date FROM tasks WHERE done = 0 AND contact_id = ?').all(ct.id),
-      timeline: db.prepare('SELECT type, body, created_at FROM activities WHERE contact_id = ? ORDER BY created_at DESC LIMIT 25').all(ct.id),
-    };
-  }
-  return { error: 'Give a company or contact name.' };
 }

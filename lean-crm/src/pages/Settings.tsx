@@ -2,10 +2,43 @@ import { useState } from 'react';
 import { api, useQuery, write, invalidateAll, toast } from '../api';
 import type { Stage } from '../types';
 import { Editable } from '../components/Editable';
+import { useSession } from '../session';
+import { AgencySettings, EnableAgency } from './AgencySettings';
 
 type Status = { ok: boolean; model: string; message: string };
 
 export function Settings() {
+  const { me } = useSession();
+  if (me.agency && me.user?.role === 'rep') return <RepSettings />;
+  return <OwnerSettings />;
+}
+
+function RepSettings() {
+  const { me } = useSession();
+  return (
+    <div className="mx-auto max-w-2xl space-y-6 p-4 md:p-8">
+      <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+      <section className="card p-4 text-sm">
+        <p className="font-semibold">{me.user?.name}</p>
+        <p className="text-zinc-500">{me.user?.email} · SDR · {me.clients.map((c) => c.name).join(', ')}</p>
+      </section>
+      <Shortcuts />
+    </div>
+  );
+}
+
+function Shortcuts() {
+  const { me } = useSession();
+  return (
+    <section className="space-y-1 text-xs text-zinc-400">
+      <p><span className="kbd">⌘K</span> command bar{me.agency ? ' (type a client name to switch)' : ''} · <span className="kbd">g</span> then <span className="kbd">t</span>/<span className="kbd">p</span>/<span className="kbd">c</span>/<span className="kbd">s</span>{me.agency && me.user?.role === 'owner' ? <>/<span className="kbd">a</span></> : null} to navigate · <span className="kbd">/</span> search contacts</p>
+      {me.agency && <p>On a contact, company or deal: <span className="kbd">1</span> connected · <span className="kbd">2</span> no answer · <span className="kbd">3</span> voicemail · <span className="kbd">e</span> email · <span className="kbd">l</span> LinkedIn · <span className="kbd">m</span> meeting booked</p>}
+    </section>
+  );
+}
+
+function OwnerSettings() {
+  const { me } = useSession();
   const stages = useQuery<Stage[]>('/stages');
   const [status, setStatus] = useState<Status | null>(null);
   const [checking, setChecking] = useState(false);
@@ -49,7 +82,7 @@ export function Settings() {
 
       <section className="card p-4">
         <h2 className="font-semibold">Pipeline stages</h2>
-        <p className="mb-3 text-sm text-zinc-500">Click a name to rename. Stages named “Won” and “Lost” count as closed.</p>
+        <p className="mb-3 text-sm text-zinc-500">Click a name to rename. Stages named “Won” and “Lost” count as closed.{me.agency ? ' Shared by all clients.' : ''}</p>
         <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
           {stages.data?.map((s, i) => (
             <li key={s.id} className="flex items-center gap-2 py-1.5">
@@ -84,13 +117,13 @@ export function Settings() {
 
       <section className="card p-4">
         <h2 className="font-semibold">Your data</h2>
-        <p className="mb-3 text-sm text-zinc-500">Everything (companies, contacts, deals, tasks, timeline) as one JSON file. CSV export is on the Contacts page.</p>
+        <p className="mb-3 text-sm text-zinc-500">Everything{me.agency ? ' in the current client workspace' : ''} (companies, contacts, deals, tasks, timeline) as one JSON file. CSV export is on the Contacts page.</p>
         <a className="btn" href="/api/export" download>Download export</a>
       </section>
 
-      <section className="text-xs text-zinc-400">
-        <p><span className="kbd">⌘K</span> command bar · <span className="kbd">g</span> then <span className="kbd">t</span>/<span className="kbd">p</span>/<span className="kbd">c</span>/<span className="kbd">s</span> to navigate · <span className="kbd">/</span> search contacts</p>
-      </section>
+{me.agency ? <AgencySettings /> : <EnableAgency />}
+
+      <Shortcuts />
     </div>
   );
 }

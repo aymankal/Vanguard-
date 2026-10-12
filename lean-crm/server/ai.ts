@@ -2,7 +2,8 @@ import { Router, type Request, type Response } from 'express';
 import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { MODEL, CHAT_MAX_ROUNDS, RESEARCH_MAX_SEARCHES, SELLER_PITCH, hasApiKey } from './config.js';
-import { db, DEAL_SELECT, today, nbaKey, type Row } from './db.js';
+import { db, today, type Row } from './db.js';
+import * as repo from './repo.js';
 import { claude, friendlyError } from './errors.js';
 import { TOOLS, isWriteTool, writeSchemas, dryRun, applyActions, summarize, runReadTool, type Action, type WriteTool } from './aiTools.js';
 import { UserError } from './store.js';
@@ -10,7 +11,7 @@ import { UserError } from './store.js';
 export const ai = Router();
 
 // Server-side refusal fallback: if the model declines, the API retries on a fallback model in the same call.
-const FALLBACK = { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const };
+export const FALLBACK = { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const };
 
 /** Open a Server-Sent Events stream; returns a send() helper and an AbortController tied to the client. */
 function sse(req: Request, res: Response) {
@@ -33,6 +34,12 @@ ai.get('/status', async (_req, res) => {
     res.json({ ok: false, model: MODEL, message: friendlyError(e).message });
   }
 });
+
+const clientLine = (clientId: number, agency: boolean) => {
+  if (!agency) return '';
+  const c = db.prepare('SELECT name FROM clients WHERE id = ?').get(clientId) as Row | undefined;
+  return ` You are working inside the client workspace "${c?.name}". All records belong to this client's outbound campaign.`;
+};
 
 // ---------- Command bar ----------
 const SYSTEM = `You are the command bar inside Lean CRM, a minimal CRM for a solo seller or small sales team.
@@ -62,7 +69,7 @@ ai.post('/chat', async (req, res) => {
   const weekday = new Date().toLocaleDateString('en-US', { weekday: 'long' });
   const system: Anthropic.Beta.BetaTextBlockParam[] = [
     { type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } },
-    { type: 'text', text: `Today is ${weekday} ${today()}. Pipeline stages, in order: ${stages.join(', ')}.` },
+    { type: 'text', text: `Today is ${weekday} ${today()}. Pipeline stages, in order: ${stages.join(', ')}.${clientLine(req.scope.clientId, req.scope.agency)}` },
   ];
   const messages: Anthropic.Beta.BetaMessageParam[] = parsed.data.messages.map((m) => ({ role: m.role, content: m.content }));
   const proposals: Action[] = [];
@@ -113,14 +120,14 @@ ai.post('/chat', async (req, res) => {
             const check = writeSchemas[tool].safeParse(u.input);
             if (!check.success) throw new UserError(check.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
             const action: Action = { tool, input: check.data as Row, summary: summarize(tool, check.data as Row) };
-            const problem = dryRun([...proposals, action]);
+            const problem = dryRun(req.scope, [...proposals, action]);
             if (problem) throw new UserError(problem);
             proposals.push(action);
             send({ type: 'proposal', action });
             results.push({ type: 'tool_result', tool_use_id: u.id, content: 'Queued for the user to confirm. Not saved yet.' });
           } else {
             send({ type: 'status', text: u.name === 'search_records' ? 'Searching…' : 'Reading account…' });
-            results.push({ type: 'tool_result', tool_use_id: u.id, content: runReadTool(u.name, u.input) });
+            results.push({ type: 'tool_result', tool_use_id: u.id, content: runReadTool(req.scope, u.name, u.input) });
           }
         } catch (e) {
           const message = e instanceof z.ZodError ? e.issues.map((i) => i.message).join('; ') : (e as Error).message;
@@ -143,7 +150,7 @@ ai.post('/apply', (req, res) => {
   const parsed = ApplyBody.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'Nothing to apply.' });
   try {
-    res.json({ applied: applyActions(parsed.data.actions as { tool: WriteTool; input: Row }[]) });
+    res.json({ applied: applyActions(req.scope, parsed.data.actions as { tool: WriteTool; input: Row }[]) });
   } catch (e) {
     const msg = e instanceof z.ZodError ? 'One of the changes is incomplete.' : (e as Error).message;
     res.status(400).json({ error: `Nothing was saved: ${msg}` });
@@ -160,11 +167,11 @@ ai.post('/research', async (req, res) => {
 
   let subject: string;
   if (kind === 'company') {
-    const c = db.prepare('SELECT * FROM companies WHERE id = ?').get(id) as Row | undefined;
+    const c = repo.researchSubject(req.scope, 'company', id);
     if (!c) return res.status(404).json({ error: 'Company not found.' });
     subject = `Company: ${c.name}${c.website ? ` (website: ${c.website})` : ''}${c.industry ? `, industry: ${c.industry}` : ''}.`;
   } else {
-    const c = db.prepare('SELECT c.*, co.name company, co.website FROM contacts c LEFT JOIN companies co ON co.id = c.company_id WHERE c.id = ?').get(id) as Row | undefined;
+    const c = repo.researchSubject(req.scope, 'contact', id);
     if (!c) return res.status(404).json({ error: 'Contact not found.' });
     subject = `Person: ${c.name}${c.title ? `, ${c.title}` : ''}${c.company ? ` at ${c.company}` : ''}${c.website ? ` (${c.website})` : ''}${c.email ? `, email ${c.email}` : ''}.`;
   }
@@ -262,20 +269,20 @@ function buildBrief(content: Anthropic.Beta.BetaContentBlock[]) {
 // ---------- Next best action (cached per deal; key changes when the timeline does) ----------
 ai.get('/nba/:id', (req, res) => {
   const id = Number(req.params.id);
-  const d = db.prepare('SELECT nba_text, nba_key FROM deals WHERE id = ?').get(id) as Row | undefined;
+  const d = repo.dealRow(req.scope, id);
   if (!d) return res.status(404).json({ error: 'Deal not found.' });
-  res.json({ text: d.nba_text ?? null, fresh: !!d.nba_text && d.nba_key === nbaKey(id) });
+  res.json({ text: d.nba_text ?? null, fresh: !!d.nba_text && d.nba_key === repo.nbaKey(req.scope, id) });
 });
 
 ai.post('/nba/:id', async (req, res) => {
   const id = Number(req.params.id);
-  const deal = db.prepare(`${DEAL_SELECT} WHERE d.id = ?`).get(id) as Row | undefined;
+  const deal = repo.dealRow(req.scope, id);
   if (!deal) return res.status(404).json({ error: 'Deal not found.' });
-  const key = nbaKey(id);
+  const key = repo.nbaKey(req.scope, id);
   if (deal.nba_text && deal.nba_key === key && !req.query.force) return res.json({ text: deal.nba_text, fresh: true });
 
-  const timeline = db.prepare('SELECT type, body, created_at FROM activities WHERE deal_id = ? ORDER BY created_at DESC LIMIT 30').all(id);
-  const tasks = db.prepare('SELECT title, due_date FROM tasks WHERE deal_id = ? AND done = 0').all(id);
+  const timeline = repo.dealTimeline(req.scope, id);
+  const tasks = repo.openDealTasks(req.scope, id);
   const stages = (db.prepare('SELECT name FROM stages ORDER BY position').all() as Row[]).map((s) => s.name).join(' → ');
   try {
     const msg = await claude().beta.messages.create({
@@ -297,7 +304,7 @@ Timeline (newest first): ${JSON.stringify(timeline)}`,
     });
     const text = msg.content.map((b) => (b.type === 'text' ? b.text : '')).join('').trim().split('\n')[0];
     if (!text) throw new Error('empty');
-    db.prepare('UPDATE deals SET nba_text = ?, nba_key = ? WHERE id = ?').run(text, key, id);
+    db.prepare('UPDATE deals SET nba_text = ?, nba_key = ? WHERE id = ? AND client_id = ?').run(text, key, id, req.scope.clientId);
     res.json({ text, fresh: true });
   } catch (e) {
     const f = friendlyError(e);

@@ -1,0 +1,54 @@
+name: Lean CRM
+
+on:
+  push:
+    paths: ['lean-crm/**', '.github/workflows/lean-crm.yml']
+  pull_request:
+    paths: ['lean-crm/**', '.github/workflows/lean-crm.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: lean-crm
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: lean-crm/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Unit tests (isolation, scoring, reports, migration)
+        run: npm test
+      - run: npx vite build
+
+  live-ai:
+    # Calls the real Claude API using the ANTHROPIC_API_KEY repository secret.
+    # Add it under Settings → Secrets and variables → Actions. Without it this job skips.
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: lean-crm/package-lock.json
+      - run: npm ci
+      - name: Live Claude checks
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::notice::ANTHROPIC_API_KEY secret is not set, skipping live Claude checks."
+            exit 0
+          fi
+          npm run test:live

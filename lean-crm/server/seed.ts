@@ -64,7 +64,7 @@ export function seedIfEmpty() {
     const ins = db.prepare('INSERT INTO stages (name, position) VALUES (?, ?)');
     DEFAULT_STAGES.forEach((s, i) => ins.run(s, i));
   }
-  const hasData = (db.prepare('SELECT COUNT(*) n FROM companies').get() as { n: number }).n > 0;
+  const hasData = (db.prepare('SELECT COUNT(*) n FROM companies WHERE client_id = 1').get() as { n: number }).n > 0;
   if (hasData) return;
 
   const stageId = (name: string) => (db.prepare('SELECT id FROM stages WHERE name = ?').get(name) as { id: number }).id;
@@ -72,21 +72,21 @@ export function seedIfEmpty() {
   db.transaction(() => {
     const coIds = companies.map(
       ([name, website, industry, size, notes]) =>
-        db.prepare('INSERT INTO companies (name, website, industry, size, notes, created_at) VALUES (?,?,?,?,?,?)')
+        db.prepare('INSERT INTO companies (client_id, name, website, industry, size, notes, created_at) VALUES (1,?,?,?,?,?,?)')
           .run(name, website, industry, size, notes, ts(-60)).lastInsertRowid as number,
     );
     const ctIds = contacts.map(
       ([name, email, phone, title, co, owner]) =>
-        db.prepare('INSERT INTO contacts (name, email, phone, title, company_id, owner, created_at) VALUES (?,?,?,?,?,?,?)')
+        db.prepare('INSERT INTO contacts (client_id, name, email, phone, title, company_id, owner, created_at) VALUES (1,?,?,?,?,?,?,?)')
           .run(name, email, phone, title, coIds[co], owner, ts(-55)).lastInsertRowid as number,
     );
     const dealIds = deals.map(
       ([title, value, stage, co, ct, close, created]) =>
-        db.prepare('INSERT INTO deals (title, value, stage_id, company_id, contact_id, close_date, created_at) VALUES (?,?,?,?,?,?,?)')
+        db.prepare('INSERT INTO deals (client_id, title, value, stage_id, company_id, contact_id, close_date, created_at) VALUES (1,?,?,?,?,?,?,?)')
           .run(title, value, stageId(stage), coIds[co], ctIds[ct], day(close), ts(created)).lastInsertRowid as number,
     );
 
-    const act = db.prepare('INSERT INTO activities (type, body, contact_id, company_id, deal_id, created_at) VALUES (?,?,?,?,?,?)');
+    const act = db.prepare('INSERT INTO activities (client_id, type, body, contact_id, company_id, deal_id, created_at) VALUES (1,?,?,?,?,?,?)');
     const dealAct = (d: number, type: string, body: string, offset: number) => {
       const [, , , co, ct] = deals[d];
       act.run(type, body, ctIds[ct], coIds[co], dealIds[d], ts(offset, 9 + (Math.abs(offset) % 8)));
@@ -114,7 +114,7 @@ export function seedIfEmpty() {
     act.run('note', 'Met Maya at Beirut Fintech Week. Warm intro via Ben.', ctIds[4], coIds[2], null, ts(-20));
     act.run('note', 'Laila mentioned replatforming to Shopify Plus in spring.', ctIds[18], coIds[9], null, ts(-30));
 
-    const task = db.prepare('INSERT INTO tasks (title, due_date, contact_id, deal_id, done, created_at) VALUES (?,?,?,?,?,?)');
+    const task = db.prepare('INSERT INTO tasks (client_id, title, due_date, contact_id, deal_id, done, created_at) VALUES (1,?,?,?,?,?,?)');
     task.run('Follow up with Sara on CFO review', day(-1), ctIds[0], dealIds[0], 0, ts(-2));
     task.run('Chase Cedar & Stone legal on SLA', day(-3), ctIds[5], dealIds[3], 0, ts(-10));
     task.run('Send Oasis revised staffing plan', day(0), ctIds[15], dealIds[8], 0, ts(-5));

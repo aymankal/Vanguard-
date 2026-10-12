@@ -6,6 +6,9 @@ import { Editable } from '../components/Editable';
 import { Markdown } from '../components/Markdown';
 import { TaskRow } from '../components/TaskRow';
 import { ResearchPanel, NextBestAction } from '../components/AiPanels';
+import { QuickLog } from '../components/QuickLog';
+import { useSession } from '../session';
+import type { MeetingStatus } from '../types';
 import { ago, fmtDate, money, todayStr, addDays } from '../format';
 
 type Kind = 'contacts' | 'companies' | 'deals';
@@ -16,6 +19,7 @@ export function RecordPage() {
   const valid = ['contacts', 'companies', 'deals'].includes(kind);
   const { data, mutate, reload, error } = useQuery<RecordData>(valid ? `/${kind}/${id}` : null);
   const navigate = useNavigate();
+  const { me } = useSession();
 
   if (!valid) return <p className="p-8 text-zinc-500">Page not found.</p>;
   if (error && !data) return <div className="p-8"><p className="text-red-600">{error}</p><Link className="text-sm text-indigo-600" to="/contacts">← Back</Link></div>;
@@ -54,8 +58,14 @@ export function RecordPage() {
 
       <div className="grid gap-4 lg:grid-cols-5">
         <section className="order-2 space-y-3 lg:order-1 lg:col-span-3">
+          {me.agency && (
+            <QuickLog fk={fk} onLogged={(a) => mutate((d) => ({ ...d, activities: [a, ...d.activities] }))} onChanged={reload} />
+          )}
           <Composer fk={fk} onLogged={(a) => { mutate((d) => ({ ...d, activities: [a, ...d.activities] })); reload(); }} />
-          <Timeline items={data.activities} />
+          <Timeline items={data.activities} showUser={me.agency} onMeeting={(a, status) => {
+            mutate((d) => ({ ...d, activities: d.activities.map((x) => (x.id === a.id ? { ...x, meeting_status: status } : x)) }));
+            write(api(`/activities/${a.id}`, { method: 'PATCH', body: { meeting_status: status } }));
+          }} />
         </section>
         <aside className="order-1 space-y-4 lg:order-2 lg:col-span-2">
           <Details kind={kind} data={data} saveField={saveField} />
@@ -277,14 +287,22 @@ function Composer({ fk, onLogged }: { fk: Record<string, number>; onLogged: (a: 
   );
 }
 
+const GREY = 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200';
 const ICON: Record<Activity['type'], { icon: string; cls: string; label: string }> = {
-  note: { icon: '✎', cls: 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200', label: 'Note' },
+  note: { icon: '✎', cls: GREY, label: 'Note' },
   email: { icon: '✉', cls: 'bg-sky-100 text-sky-700 dark:bg-sky-900/60 dark:text-sky-300', label: 'Email' },
   stage_change: { icon: '→', cls: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300', label: 'Stage' },
   task_done: { icon: '✓', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300', label: 'Task' },
+  call_connected: { icon: '☏', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300', label: 'Call' },
+  call_no_answer: { icon: '☏', cls: GREY, label: 'Call' },
+  call_voicemail: { icon: '☏', cls: GREY, label: 'Call' },
+  linkedin: { icon: 'in', cls: 'bg-sky-100 text-sky-700 dark:bg-sky-900/60 dark:text-sky-300', label: 'LinkedIn' },
+  meeting_booked: { icon: '★', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300', label: 'Meeting' },
 };
+const MEETING_STATUS: Record<MeetingStatus, string> = { booked: 'Booked', held: 'Held', no_show: 'No-show', cancelled: 'Cancelled' };
+const fmtMeeting = (s: string) => new Date(s.replace(' ', 'T')).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-function Timeline({ items }: { items: Activity[] }) {
+function Timeline({ items, showUser, onMeeting }: { items: Activity[]; showUser: boolean; onMeeting: (a: Activity, s: MeetingStatus) => void }) {
   if (!items.length) return <p className="px-1 text-sm text-zinc-400">No activity yet. Notes, emails, stage changes and completed tasks show up here.</p>;
   return (
     <ol className="relative space-y-3 pl-8 before:absolute before:top-2 before:bottom-2 before:left-3 before:w-px before:bg-zinc-200 dark:before:bg-zinc-800">
@@ -292,8 +310,17 @@ function Timeline({ items }: { items: Activity[] }) {
         <li key={a.id} className="relative">
           <span className={`absolute -left-8 grid h-6 w-6 place-items-center rounded-full text-xs ${ICON[a.type].cls}`}>{ICON[a.type].icon}</span>
           <div className="card px-3 py-2">
-            <p className="mb-0.5 text-[11px] text-zinc-500">{ICON[a.type].label} · {fmtDate(a.created_at)}</p>
+            <p className="mb-0.5 text-[11px] text-zinc-500">{ICON[a.type].label} · {fmtDate(a.created_at)}{showUser && a.user_name ? ` · ${a.user_name}` : ''}</p>
             {a.type === 'note' || a.type === 'email' ? <Markdown text={a.body} className="[&_p]:my-0.5" /> : <p className="text-sm">{a.body}</p>}
+            {a.type === 'meeting_booked' && (
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                {a.meeting_at && <span className="font-medium">{fmtMeeting(a.meeting_at)}</span>}
+                <select className="rounded border border-zinc-300 bg-transparent px-1 py-0.5 dark:border-zinc-700" value={a.meeting_status ?? 'booked'}
+                  disabled={a.id < 0} onChange={(e) => onMeeting(a, e.target.value as MeetingStatus)} aria-label="Meeting status">
+                  {Object.entries(MEETING_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+              </div>
+            )}
           </div>
         </li>
       ))}

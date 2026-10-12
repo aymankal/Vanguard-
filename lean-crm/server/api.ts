@@ -1,12 +1,13 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
-import { db, DEAL_SELECT, CONTACT_SELECT, COMPANY_SELECT, CLOSED_STAGE_NAMES, today, nbaKey, type Row } from './db.js';
-import { STALE_DAYS } from './config.js';
+import { db, today, type Row } from './db.js';
+import * as repo from './repo.js';
 import * as store from './store.js';
+import { ForbiddenError } from './scope.js';
 
 export const api = Router();
 
 type H = (req: Request, res: Response) => unknown;
-const h = (fn: H) => (req: Request, res: Response, next: NextFunction) => {
+export const h = (fn: H) => (req: Request, res: Response, next: NextFunction) => {
   try {
     const out = fn(req, res);
     if (out !== undefined && !res.headersSent) res.json(out);
@@ -15,11 +16,19 @@ const h = (fn: H) => (req: Request, res: Response, next: NextFunction) => {
   }
 };
 const id = (req: Request) => Number(req.params.id);
-const closedList = CLOSED_STAGE_NAMES.map((n) => `'${n}'`).join(',');
+const found = <T>(v: T | null | undefined, what: string): T => {
+  if (!v) throw new store.UserError(`${what} not found.`);
+  return v;
+};
+/** Stages are shared by all workspaces, so in Agency Mode only the owner may change them. */
+const ownerOnly = (req: Request) => {
+  if (req.scope.agency && req.scope.role !== 'owner') throw new ForbiddenError('Only the agency owner can do that.');
+};
 
 // ---------- Stages ----------
-api.get('/stages', h(() => db.prepare('SELECT id, name, position FROM stages ORDER BY position').all()));
+api.get('/stages', h(() => repo.stages()));
 api.post('/stages', h((req) => {
+  ownerOnly(req);
   const name = String(req.body.name ?? '').trim();
   if (!name) throw new store.UserError('Stage name is required.');
   const pos = (db.prepare('SELECT COALESCE(MAX(position), -1) + 1 p FROM stages').get() as { p: number }).p;
@@ -30,6 +39,7 @@ api.post('/stages', h((req) => {
   }
 }));
 api.patch('/stages/:id', h((req) => {
+  ownerOnly(req);
   const name = String(req.body.name ?? '').trim();
   if (!name) throw new store.UserError('Stage name is required.');
   try {
@@ -40,113 +50,68 @@ api.patch('/stages/:id', h((req) => {
   return { ok: true };
 }));
 api.post('/stages/reorder', h((req) => {
+  ownerOnly(req);
   const ids: number[] = req.body.ids ?? [];
   const up = db.prepare('UPDATE stages SET position = ? WHERE id = ?');
   db.transaction(() => ids.forEach((sid, i) => up.run(i, sid)))();
   return { ok: true };
 }));
 api.delete('/stages/:id', h((req) => {
+  ownerOnly(req);
   const n = (db.prepare('SELECT COUNT(*) n FROM deals WHERE stage_id = ?').get(id(req)) as { n: number }).n;
-  if (n) throw new store.UserError(`Move the ${n} deal(s) out of this stage first.`);
+  if (n) throw new store.UserError(`Move the ${n} deal(s) out of this stage first${req.scope.agency ? ' (across all clients)' : ''}.`);
   if ((db.prepare('SELECT COUNT(*) n FROM stages').get() as { n: number }).n <= 1) throw new store.UserError('You need at least one stage.');
   db.prepare('DELETE FROM stages WHERE id = ?').run(id(req));
   return { ok: true };
 }));
 
 // ---------- Companies ----------
-api.get('/companies', h(() => db.prepare(`${COMPANY_SELECT} ORDER BY co.name COLLATE NOCASE`).all()));
-api.get('/companies/:id', h((req) => {
-  const company = db.prepare(`${COMPANY_SELECT} WHERE co.id = ?`).get(id(req));
-  if (!company) throw new store.UserError('Company not found.');
-  return {
-    company,
-    contacts: db.prepare(`${CONTACT_SELECT} WHERE c.company_id = ? ORDER BY c.name`).all(id(req)),
-    deals: db.prepare(`${DEAL_SELECT} WHERE d.company_id = ? ORDER BY d.created_at DESC`).all(id(req)),
-    tasks: db.prepare(`SELECT t.* FROM tasks t LEFT JOIN contacts c ON c.id = t.contact_id LEFT JOIN deals d ON d.id = t.deal_id
-                       WHERE (c.company_id = ? OR d.company_id = ?) ORDER BY t.done, t.due_date`).all(id(req), id(req)),
-    activities: db.prepare('SELECT * FROM activities WHERE company_id = ? ORDER BY created_at DESC, id DESC').all(id(req)),
-  };
-}));
-api.post('/companies', h((req) => ({ id: store.createCompany(req.body) })));
-api.patch('/companies/:id', h((req) => (store.patch('companies', id(req), req.body), { ok: true })));
-api.delete('/companies/:id', h((req) => (db.prepare('DELETE FROM companies WHERE id = ?').run(id(req)), { ok: true })));
+api.get('/companies', h((req) => repo.listCompanies(req.scope)));
+api.get('/companies/:id', h((req) => found(repo.getCompany(req.scope, id(req)), 'Company')));
+api.post('/companies', h((req) => ({ id: store.createCompany(req.scope, req.body) })));
+api.patch('/companies/:id', h((req) => (store.patch(req.scope, 'companies', id(req), req.body), { ok: true })));
+api.delete('/companies/:id', h((req) => (store.deleteRecord(req.scope, 'companies', id(req)), { ok: true })));
 
 // ---------- Contacts ----------
-api.get('/contacts', h(() => db.prepare(`${CONTACT_SELECT} ORDER BY c.name COLLATE NOCASE`).all()));
-api.get('/contacts/:id', h((req) => {
-  const contact = db.prepare(`${CONTACT_SELECT} WHERE c.id = ?`).get(id(req));
-  if (!contact) throw new store.UserError('Contact not found.');
-  return {
-    contact,
-    deals: db.prepare(`${DEAL_SELECT} WHERE d.contact_id = ? ORDER BY d.created_at DESC`).all(id(req)),
-    tasks: db.prepare('SELECT * FROM tasks WHERE contact_id = ? OR deal_id IN (SELECT id FROM deals WHERE contact_id = ?) ORDER BY done, due_date').all(id(req), id(req)),
-    activities: db.prepare('SELECT * FROM activities WHERE contact_id = ? ORDER BY created_at DESC, id DESC').all(id(req)),
-  };
-}));
-api.post('/contacts', h((req) => ({ id: store.createContact(req.body) })));
-api.patch('/contacts/:id', h((req) => (store.patch('contacts', id(req), req.body), { ok: true })));
-api.delete('/contacts/:id', h((req) => (db.prepare('DELETE FROM contacts WHERE id = ?').run(id(req)), { ok: true })));
+api.get('/contacts', h((req) => repo.listContacts(req.scope)));
+api.get('/contacts/:id', h((req) => found(repo.getContact(req.scope, id(req)), 'Contact')));
+api.post('/contacts', h((req) => ({ id: store.createContact(req.scope, req.body) })));
+api.patch('/contacts/:id', h((req) => (store.patch(req.scope, 'contacts', id(req), req.body), { ok: true })));
+api.delete('/contacts/:id', h((req) => (store.deleteRecord(req.scope, 'contacts', id(req)), { ok: true })));
 
 // ---------- Deals ----------
-api.get('/deals', h(() =>
-  (db.prepare(`${DEAL_SELECT} ORDER BY d.created_at DESC`).all() as Row[]).map(({ nba_key, ...d }) => ({
+api.get('/deals', h((req) =>
+  repo.listDeals(req.scope).map(({ nba_key, ...d }) => ({
     ...d,
-    nba_fresh: !!d.nba_text && nba_key === nbaKey(d.id as number),
+    nba_fresh: !!d.nba_text && nba_key === repo.nbaKey(req.scope, d.id as number),
   })),
 ));
-api.get('/deals/:id', h((req) => {
-  const deal = db.prepare(`${DEAL_SELECT} WHERE d.id = ?`).get(id(req));
-  if (!deal) throw new store.UserError('Deal not found.');
-  return {
-    deal,
-    tasks: db.prepare('SELECT * FROM tasks WHERE deal_id = ? ORDER BY done, due_date').all(id(req)),
-    activities: db.prepare('SELECT * FROM activities WHERE deal_id = ? ORDER BY created_at DESC, id DESC').all(id(req)),
-  };
-}));
-api.post('/deals', h((req) => ({ id: store.createDeal(req.body) })));
+api.get('/deals/:id', h((req) => found(repo.getDeal(req.scope, id(req)), 'Deal')));
+api.post('/deals', h((req) => ({ id: store.createDeal(req.scope, req.body) })));
 api.patch('/deals/:id', h((req) => {
-  if (req.body.stage_id != null) store.setDealStage(id(req), Number(req.body.stage_id));
-  store.patch('deals', id(req), req.body);
+  if (req.body.stage_id != null) store.setDealStage(req.scope, id(req), Number(req.body.stage_id));
+  store.patch(req.scope, 'deals', id(req), req.body);
   return { ok: true };
 }));
-api.delete('/deals/:id', h((req) => (db.prepare('DELETE FROM deals WHERE id = ?').run(id(req)), { ok: true })));
+api.delete('/deals/:id', h((req) => (store.deleteRecord(req.scope, 'deals', id(req)), { ok: true })));
 
 // ---------- Tasks ----------
-const TASK_SELECT = `SELECT t.*, c.name AS contact, d.title AS deal FROM tasks t
-  LEFT JOIN contacts c ON c.id = t.contact_id LEFT JOIN deals d ON d.id = t.deal_id`;
-api.post('/tasks', h((req) => ({ id: store.createTask(req.body) })));
+api.post('/tasks', h((req) => ({ id: store.createTask(req.scope, req.body) })));
 api.patch('/tasks/:id', h((req) => {
-  if ('done' in req.body) store.setTaskDone(id(req), Boolean(req.body.done));
-  store.patch('tasks', id(req), req.body);
+  if ('done' in req.body) store.setTaskDone(req.scope, id(req), Boolean(req.body.done));
+  store.patch(req.scope, 'tasks', id(req), req.body);
   return { ok: true };
 }));
-api.delete('/tasks/:id', h((req) => (db.prepare('DELETE FROM tasks WHERE id = ?').run(id(req)), { ok: true })));
+api.delete('/tasks/:id', h((req) => (store.deleteRecord(req.scope, 'tasks', id(req)), { ok: true })));
 
 // ---------- Activities ----------
-api.post('/activities', h((req) => ({ id: store.addActivity(req.body) })));
+api.post('/activities', h((req) => ({ id: store.addActivity(req.scope, req.body) })));
+api.patch('/activities/:id', h((req) => (store.updateMeeting(req.scope, id(req), req.body), { ok: true })));
+api.delete('/activities/:id', h((req) => (store.deleteActivity(req.scope, id(req)), { ok: true })));
 
-// ---------- Today ----------
-api.get('/today', h(() => {
-  const t = today();
-  return {
-    today: t,
-    overdue: db.prepare(`${TASK_SELECT} WHERE t.done = 0 AND t.due_date < ? ORDER BY t.due_date`).all(t),
-    due: db.prepare(`${TASK_SELECT} WHERE t.done = 0 AND t.due_date = ? ORDER BY t.id`).all(t),
-    upcoming: db.prepare(`${TASK_SELECT} WHERE t.done = 0 AND t.due_date > ? AND t.due_date <= date(?, '+7 days') ORDER BY t.due_date`).all(t, t),
-    stale: db.prepare(`SELECT * FROM (${DEAL_SELECT} WHERE lower(s.name) NOT IN (${closedList}))
-                       WHERE last_activity < datetime('now', ?) ORDER BY last_activity`).all(`-${STALE_DAYS} days`),
-  };
-}));
-
-// ---------- Search (global, for the command bar's quick-jump) ----------
-api.get('/search', h((req) => {
-  const q = `%${String(req.query.q ?? '').trim()}%`;
-  return [
-    ...(db.prepare(`SELECT 'contact' AS kind, id, name AS label, email AS sub FROM contacts WHERE name LIKE ? OR email LIKE ? LIMIT 5`).all(q, q) as Row[]),
-    ...(db.prepare(`SELECT 'company' AS kind, id, name AS label, industry AS sub FROM companies WHERE name LIKE ? LIMIT 5`).all(q) as Row[]),
-    ...(db.prepare(`SELECT 'deal' AS kind, id, title AS label, '' AS sub FROM deals WHERE title LIKE ? LIMIT 5`).all(q) as Row[]),
-  ];
-}));
+// ---------- Today / search ----------
+api.get('/today', h((req) => repo.today(req.scope, today())));
+api.get('/search', h((req) => repo.quickSearch(req.scope, String(req.query.q ?? '').trim())));
 
 // ---------- CSV import (client parses CSV, sends rows) ----------
 api.post('/import/:kind', h((req) => {
@@ -159,11 +124,13 @@ api.post('/import/:kind', h((req) => {
   db.transaction(() => {
     rows.forEach((raw, i) => {
       const r = lower(raw);
+      delete r.company_id; // never trust ids from a file
       try {
-        if (kind === 'contacts') store.createContact(r);
-        else store.createCompany(r);
+        if (kind === 'contacts') store.createContact(req.scope, r);
+        else store.createCompany(req.scope, r);
         created++;
       } catch (e) {
+        if (e instanceof ForbiddenError) throw e;
         skipped.push(`Row ${i + 2}: ${(e as Error).message}`);
       }
     });
@@ -171,18 +138,17 @@ api.post('/import/:kind', h((req) => {
   return { created, skipped };
 }));
 
-// ---------- Full export ----------
-api.get('/export', h((_req, res) => {
-  const dump = Object.fromEntries(
-    ['stages', 'companies', 'contacts', 'deals', 'tasks', 'activities'].map((t) => [t, db.prepare(`SELECT * FROM ${t}`).all()]),
-  );
+// ---------- Export (current workspace) ----------
+api.get('/export', h((req, res) => {
+  ownerOnly(req);
   res.setHeader('Content-Disposition', `attachment; filename="lean-crm-export-${today()}.json"`);
-  res.json({ exported_at: new Date().toISOString(), ...dump });
+  res.json({ exported_at: new Date().toISOString(), ...repo.exportData(req.scope) });
 }));
 
-// ---------- Errors ----------
-api.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+// ---------- Errors (shared) ----------
+export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction) {
   if (err instanceof store.UserError) return res.status(400).json({ error: err.message });
+  if (err instanceof ForbiddenError) return res.status(403).json({ error: err.message });
   console.error(err);
   res.status(500).json({ error: 'Something went wrong on the server. Check the terminal for details.' });
-});
+}

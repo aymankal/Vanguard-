@@ -2,18 +2,35 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 
 export class ApiError extends Error {}
 
+// Active client workspace (Agency Mode). Sent on every request; the server re-checks access.
+let activeClient: number | null = null;
+export const getActiveClient = () => activeClient;
+export function setActiveClient(id: number | null) {
+  if (id === activeClient) return;
+  activeClient = id;
+  cache.clear();
+  invalidateAll();
+}
+const headers = (json: boolean): Record<string, string> => ({
+  ...(json ? { 'Content-Type': 'application/json' } : {}),
+  ...(activeClient ? { 'X-Client-Id': String(activeClient) } : {}),
+});
+/** Fired when the session expires so the app can show the sign-in page. */
+const signedOut = () => window.dispatchEvent(new Event('lc:signed-out'));
+
 export async function api<T = unknown>(url: string, opts: { method?: string; body?: unknown } = {}): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`/api${url}`, {
       method: opts.method ?? 'GET',
-      headers: opts.body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      headers: headers(opts.body !== undefined),
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
     });
   } catch {
     throw new ApiError("Can't reach the Lean CRM server. Is `npm run dev` running?");
   }
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && data.code === 'auth') signedOut();
   if (!res.ok) throw new ApiError(data.error || `Request failed (${res.status}).`);
   return data as T;
 }
@@ -22,13 +39,14 @@ export async function api<T = unknown>(url: string, opts: { method?: string; bod
 export async function stream(url: string, body: unknown, onEvent: (e: Record<string, any>) => void, signal?: AbortSignal) {
   let res: Response;
   try {
-    res = await fetch(`/api${url}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal });
+    res = await fetch(`/api${url}`, { method: 'POST', headers: headers(true), body: JSON.stringify(body), signal });
   } catch (e) {
     if (signal?.aborted) return;
     throw new ApiError("Can't reach the Lean CRM server. Is `npm run dev` running?");
   }
   if (!res.ok || !res.body) {
     const data = await res.json().catch(() => ({}));
+    if (res.status === 401 && data.code === 'auth') signedOut();
     throw new ApiError(data.error || `Request failed (${res.status}).`);
   }
   const reader = res.body.getReader();
@@ -49,11 +67,12 @@ export async function stream(url: string, body: unknown, onEvent: (e: Record<str
 
 // ---------- Tiny query cache: instant revisits, background refresh, global invalidation ----------
 const cache = new Map<string, unknown>();
+const key = (url: string) => `${activeClient ?? 0}|${url}`;
 const reloaders = new Set<() => void>();
 export const invalidateAll = () => reloaders.forEach((r) => r());
 
 export function useQuery<T>(url: string | null) {
-  const [data, setData] = useState<T | undefined>(() => (url ? (cache.get(url) as T) : undefined));
+  const [data, setData] = useState<T | undefined>(() => (url ? (cache.get(key(url)) as T) : undefined));
   const [error, setError] = useState<string | null>(null);
   const urlRef = useRef(url);
   urlRef.current = url;
@@ -62,8 +81,9 @@ export function useQuery<T>(url: string | null) {
     const u = urlRef.current;
     if (!u) return;
     try {
+      const k = key(u);
       const d = await api<T>(u);
-      cache.set(u, d);
+      cache.set(k, d);
       if (urlRef.current === u) {
         setData(d);
         setError(null);
@@ -74,7 +94,7 @@ export function useQuery<T>(url: string | null) {
   }, []);
 
   useEffect(() => {
-    setData(url ? (cache.get(url) as T) : undefined);
+    setData(url ? (cache.get(key(url)) as T) : undefined);
     reload();
   }, [url, reload]);
 
@@ -88,7 +108,7 @@ export function useQuery<T>(url: string | null) {
     setData((d) => {
       if (d === undefined) return d;
       const next = fn(d);
-      if (urlRef.current) cache.set(urlRef.current, next);
+      if (urlRef.current) cache.set(key(urlRef.current), next);
       return next;
     });
   }, []);
@@ -97,17 +117,21 @@ export function useQuery<T>(url: string | null) {
 }
 
 // ---------- Toasts ----------
-type Toast = { id: number; text: string; kind: 'error' | 'ok' };
+type Toast = { id: number; text: string; kind: 'error' | 'ok'; action?: { label: string; run: () => void } };
 let toasts: Toast[] = [];
 const toastSubs = new Set<() => void>();
-export function toast(text: string, kind: Toast['kind'] = 'ok') {
-  const t = { id: Date.now() + Math.random(), text, kind };
+export function toast(text: string, kind: Toast['kind'] = 'ok', action?: Toast['action']) {
+  const t: Toast = { id: Date.now() + Math.random(), text, kind, action };
   toasts = [...toasts, t];
   toastSubs.forEach((s) => s());
   setTimeout(() => {
     toasts = toasts.filter((x) => x !== t);
     toastSubs.forEach((s) => s());
-  }, kind === 'error' ? 6000 : 2500);
+  }, kind === 'error' ? 6000 : action ? 5000 : 2500);
+}
+export function dismissToast(id: number) {
+  toasts = toasts.filter((x) => x.id !== id);
+  toastSubs.forEach((s) => s());
 }
 export const useToasts = () =>
   useSyncExternalStore((cb) => (toastSubs.add(cb), () => void toastSubs.delete(cb)), () => toasts);
