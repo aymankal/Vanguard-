@@ -1,6 +1,6 @@
 /* Service worker: makes Scout Desk installable from Chrome and lets the launcher open offline.
    Network-first and revalidated so every deploy shows up on the next open. Data requests (Supabase, another origin) are never cached. */
-const CACHE = "scout-desk-v6";
+const CACHE = "scout-desk-v7";
 const SHELL = ["./", "styles.css", "app.js", "auth.js", "data.js", "config.js", "sw-register.js", "install.js",
   "vendor/supabase-js-2.117.2.js", "icons/v-mark-white.png", "icons/icon-192.png"];
 
