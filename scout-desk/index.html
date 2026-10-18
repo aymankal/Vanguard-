@@ -57,7 +57,7 @@
 <div class="wrap" id="desk" hidden>
   <header class="top">
     <div class="top-row">
-      <div class="brand"><img class="mark" src="icons/v-mark.png" alt="Vanguard Services S.A.L logo"><div class="eyebrow">Vanguard Services S.A.L</div></div>
+      <div class="brand"><img class="mark" src="icons/v-mark-white.png" alt="Vanguard Services S.A.L logo"><div class="eyebrow">Vanguard Services S.A.L</div></div>
       <div class="who"><span class="who-name" id="who-name"></span><span class="role" id="role">Connecting…</span><img id="avatar" alt="" hidden><button class="btn small" type="button" data-signout>Sign out</button></div>
     </div>
     <div class="hero">
@@ -81,7 +81,7 @@
     <!-- PIPELINE -->
     <section class="view" id="view-pipeline">
       <div class="view-head">
-        <div><h2>Deal pipeline</h2><p class="sub">Approved startups, ranked by Frontier Fit Score. Tap a deal for the full file.</p></div>
+        <div><h2>Deal pipeline <span class="h-count num" id="deal-total"></span></h2><p class="sub">Approved startups, ranked by Frontier Fit Score. Tap a deal for the full file.</p></div>
         <div class="searchbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="deal-search" placeholder="Search startup, founder, investor, city" aria-label="Search the pipeline" autocomplete="off"><button class="clear" id="deal-search-clear" type="button" aria-label="Clear search" hidden>✕</button><kbd>/</kbd></div>
       </div>
       <div class="strip-scroll"><div class="strip" id="strip"></div></div>
@@ -129,7 +129,7 @@
     <!-- INVESTORS -->
     <section class="view" id="view-investors" hidden>
       <div class="view-head">
-        <div><h2>Investor database</h2><p class="sub">Fund-level entries for co-invest and follow-on matching.</p></div>
+        <div><h2>Investor database <span class="h-count num" id="inv-total"></span></h2><p class="sub">Fund-level entries for co-invest and follow-on matching.</p></div>
         <input type="text" class="search" id="inv-search" placeholder="Search fund, firm, partner" aria-label="Search investors">
       </div>
       <div class="filters" id="inv-filters"></div>
@@ -146,7 +146,7 @@
     <!-- ABOUT -->
     <section class="view" id="view-about" hidden>
       <div class="about-hero">
-        <img class="about-mark" src="icons/v-mark.png" alt="">
+        <img class="about-mark" src="icons/v-mark-white.png" alt="">
         <div class="eyebrow">The venture arm of Vanguard Services S.A.L</div>
         <h2>Vanguard Frontier</h2>
         <p class="sub">We back B2B founders at pre-seed and seed, then help them sell. Vanguard already runs SDR, sales and customer support teams for international clients. Frontier puts that operating muscle behind the companies we invest in.</p>
@@ -196,6 +196,7 @@
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div class="scroll-count" id="scroll-count" aria-live="off" hidden><b class="num" id="sc-at">0</b><span class="sc-of">of <span class="num" id="sc-total">0</span> <span id="sc-noun">startups</span></span></div>
 
 <script src="vendor/supabase-js-2.117.2.js"></script>
 <script src="config.js"></script>

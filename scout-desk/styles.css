@@ -326,3 +326,17 @@ mark{background:var(--brass-soft);color:inherit;border-radius:4px;padding:0 2px}
 .spinner{width:28px;height:28px;border-radius:50%;border:3px solid var(--field);border-top-color:var(--accent);animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (max-width:480px){.brand .eyebrow{display:none}.who{gap:6px}}
+
+/* list counters */
+.h-count{font-size:.5em;font-weight:600;color:var(--muted);background:var(--field);border-radius:980px;padding:2px 10px;vertical-align:middle;letter-spacing:0}
+.h-count:empty{display:none}
+.scroll-count{position:fixed;right:max(16px,calc((100vw - 1040px)/2 + 20px));bottom:calc(20px + var(--nav-h) + env(safe-area-inset-bottom,0px));z-index:30;display:flex;align-items:baseline;gap:6px;padding:9px 16px;border-radius:980px;background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(22px);backdrop-filter:saturate(180%) blur(22px);box-shadow:0 0 0 1px var(--line),var(--shadow);font-size:13px;color:var(--muted);pointer-events:none;opacity:.78;transition:opacity .3s var(--ease),transform .3s var(--ease)}
+.scroll-count b{font-family:var(--f-display);font-size:20px;font-weight:700;color:var(--ink);letter-spacing:-.02em;display:inline-block;min-width:1ch;text-align:right}
+.scroll-count.active{opacity:1;transform:translateY(-2px)}
+@media (prefers-reduced-motion:no-preference){.scroll-count.tick b{animation:sc-tick .28s var(--ease)}@keyframes sc-tick{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}}
+.toast:not([hidden])~.scroll-count{opacity:0}
+
+/* white V logo: white on dark, ink on light so it never disappears */
+.brand .mark,.about-mark{filter:brightness(0)}
+:root[data-theme="dark"] .brand .mark,:root[data-theme="dark"] .about-mark{filter:none}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .brand .mark,:root:not([data-theme="light"]) .about-mark{filter:none}}
