@@ -22,12 +22,12 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Confirmation and password-reset links for the desk open in the app. -->
+            <!-- Confirmation and password-reset links for this app's site open in the app. -->
             <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="aymankal.github.io" android:pathPrefix="/Vanguard-/scout-desk" />
+                <data android:scheme="https" android:host="aymankal.github.io" android:pathPrefix="${deskPath}" />
             </intent-filter>
         </activity>
     </application>

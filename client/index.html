@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Vanguard</title>
+  <meta name="description" content="Vanguard Services client app: weekly reports, live pipeline, updates, pilots and a direct line to your Vanguard team.">
+  <meta name="theme-color" content="#0B1220">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Vanguard">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="client.css">
+</head>
+<body>
+<div class="gate" id="gate">
+  <div class="gate-card">
+    <img class="gate-icon" src="icons/icon-192.png" alt="" width="84" height="84">
+    <div class="eyebrow">Vanguard Services</div>
+    <h1 class="gate-title">Client Hub</h1>
+    <p class="sub" style="text-align:center">Your reports, pipeline and team, in one place.</p>
+    <div class="spinner" id="gate-loading" role="status" aria-label="Loading"></div>
+
+    <form id="auth-form" hidden novalidate>
+      <div class="seg" id="auth-seg" role="tablist" aria-label="Sign in or join">
+        <button type="button" data-m="signin" aria-selected="true">Sign in</button>
+        <button type="button" data-m="signup" aria-selected="false">Join</button>
+      </div>
+      <div class="field" id="f-name" hidden><label for="auth-name">Your name</label><input type="text" id="auth-name" autocomplete="name"></div>
+      <div class="field"><label for="auth-email">Work email</label><input type="email" id="auth-email" autocomplete="email" inputmode="email"></div>
+      <div class="field"><label for="auth-pass">Password</label><input type="password" id="auth-pass" autocomplete="current-password"></div>
+      <button class="btn primary" type="submit" id="auth-submit">Sign in</button>
+      <button class="linkbtn" type="button" id="forgot">Forgot password?</button>
+      <p class="help" id="auth-msg" role="status"></p>
+    </form>
+    <button class="btn install-big" type="button" data-install hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Install the app</span></button>
+
+    <form id="reset-form" hidden novalidate>
+      <p class="sub" style="text-align:center">Choose a new password.</p>
+      <div class="field"><label for="reset-pass">New password</label><input type="password" id="reset-pass" autocomplete="new-password"></div>
+      <button class="btn primary" type="submit">Save password</button>
+      <p class="help" id="reset-msg" role="status"></p>
+    </form>
+
+    <div id="pending" hidden>
+      <p class="sub">You're signed in as <b id="pending-who"></b>. Your Vanguard account manager will connect you to your company shortly. You'll see everything here once that's done.</p>
+      <div style="display:flex;gap:10px;justify-content:center;margin-top:16px">
+        <button class="btn primary" type="button" id="pending-check">Check again</button>
+        <button class="btn" type="button" data-signout>Sign out</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap" id="app" hidden>
+  <header class="top">
+    <div class="top-row">
+      <div class="brand"><img class="mark" src="icons/v-mark-white.png" alt="Vanguard"><div class="eyebrow">Vanguard Services</div></div>
+      <div class="who"><span class="who-name" id="who-name"></span><span class="role" id="role"></span><button class="btn small primary install-btn" type="button" data-install hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Install</span></button><button class="btn small" type="button" data-signout>Sign out</button></div>
+    </div>
+    <div class="client-bar" id="client-bar">
+      <div>
+        <div class="eyebrow" id="client-eyebrow">Client</div>
+        <h1 class="client-name" id="client-name"></h1>
+      </div>
+      <div class="client-pick" id="client-pick" hidden>
+        <label class="sr" for="client-select">Viewing client</label>
+        <select id="client-select" aria-label="Viewing client"></select>
+        <button class="btn small" type="button" id="client-add">New client</button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab" role="tab" data-tab="home" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
+    <button class="tab" role="tab" data-tab="reports" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Reports</button>
+    <button class="tab" role="tab" data-tab="pipeline" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></svg>Pipeline</button>
+    <button class="tab" role="tab" data-tab="updates" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg><span>Updates</span><span class="count" id="updates-count"></span></button>
+    <button class="tab" role="tab" data-tab="pilot" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15c-1.5 1.3-2 4-2 6 2 0 4.7-.5 6-2M9 13l2 2M14 4c3 0 6 3 6 6l-7 7-6-6z"/><circle cx="15" cy="9" r="1.5"/></svg>Pilot</button>
+    <button class="tab" role="tab" data-tab="chat" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg><span>Chat</span><span class="count" id="chat-count"></span></button>
+    <button class="tab" role="tab" data-tab="team" aria-selected="false" id="t-team" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 11a3 3 0 1 0 0-6M22 21c0-3-1.5-5-4-5.7"/></svg><span>Team</span><span class="count" id="team-count"></span></button>
+  </nav>
+
+  <main>
+    <section class="view" id="view-home">
+      <div class="view-head"><div><h2 id="hello">Welcome</h2><p class="sub" id="hello-sub">Here's where things stand this week.</p></div></div>
+      <div id="home-body" class="stack"></div>
+    </section>
+
+    <section class="view" id="view-reports" hidden>
+      <div class="view-head">
+        <div><h2>Weekly reports</h2><p class="sub">Activity and results from your Vanguard team, week by week.</p></div>
+        <button class="btn primary staff-only" type="button" id="report-new">New weekly report</button>
+      </div>
+      <div class="list" id="report-list"></div>
+    </section>
+
+    <section class="view" id="view-pipeline" hidden>
+      <div class="view-head">
+        <div><h2>Pipeline <span class="h-count num" id="deal-total"></span></h2><p class="sub">Every opportunity we're working for you, updated as it moves.</p></div>
+        <button class="btn primary staff-only" type="button" id="deal-new">Add opportunity</button>
+      </div>
+      <div class="strip-scroll"><div class="strip" id="pipe-strip"></div></div>
+      <div class="filters" id="pipe-filters"></div>
+      <div class="list" id="deal-list"></div>
+    </section>
+
+    <section class="view" id="view-updates" hidden>
+      <div class="view-head">
+        <div><h2>Updates</h2><p class="sub">News, milestones and anything we need from you.</p></div>
+        <button class="btn primary staff-only" type="button" id="update-new">Post update</button>
+      </div>
+      <div class="list" id="update-list"></div>
+    </section>
+
+    <section class="view" id="view-pilot" hidden>
+      <div class="view-head">
+        <div><h2>Pilot</h2><p class="sub">Try a Vanguard team on a focused goal before you scale. Tell us what you want to prove and we'll scope it with you.</p></div>
+        <button class="btn primary" type="button" id="pilot-new">Start a pilot</button>
+      </div>
+      <div class="list" id="pilot-list"></div>
+    </section>
+
+    <section class="view view-chat" id="view-chat" hidden>
+      <div class="view-head"><div><h2>Ask your team</h2><p class="sub" id="chat-sub">Messages go straight to your Vanguard account team.</p></div></div>
+      <div class="chat card-like">
+        <div class="log" id="chat-log" aria-live="polite"></div>
+        <form class="compose" id="chat-form">
+          <textarea id="chat-input" rows="1" placeholder="Write a message…" aria-label="Message"></textarea>
+          <button class="btn primary" type="submit" id="chat-send">Send</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="view" id="view-team" hidden>
+      <div class="view-head"><div><h2>Team and clients</h2><p class="sub">Connect each new sign-up to their company. Clients only ever see their own company.</p></div></div>
+      <div id="team-body" class="stack"></div>
+    </section>
+  </main>
+</div>
+
+<div class="scrim" id="sheet" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <div class="panel-head"><div><div class="eyebrow" id="sheet-eyebrow"></div><h2 id="sheet-title"></h2></div><button class="x" id="sheet-close" type="button" aria-label="Close">✕</button></div>
+    <div class="pbody" id="sheet-body"></div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+<div class="scroll-count" id="scroll-count" hidden><b class="num" id="sc-at">0</b><span class="sc-of">of <span class="num" id="sc-total">0</span> <span id="sc-noun">opportunities</span></span></div>
+<div class="scrim" id="install-sheet" hidden>
+  <div class="panel install-panel" role="dialog" aria-modal="true" aria-labelledby="install-title">
+    <div class="panel-head"><div><div class="eyebrow">Vanguard</div><h2 id="install-title">Install the app</h2></div><button class="x" type="button" data-install-close aria-label="Close">✕</button></div>
+    <div class="pbody">
+      <img class="gate-icon" src="icons/icon-192.png" alt="" width="72" height="72" style="width:72px;height:72px">
+      <ol class="install-steps" id="install-steps"></ol>
+      <a class="btn primary" id="install-apk" href="https://github.com/aymankal/Vanguard-/releases/latest/download/VanguardClient.apk" download hidden>Download the Android app</a>
+      <button class="btn" type="button" data-install-close>Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/supabase-js-2.117.2.js"></script>
+<script src="config.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script src="auth.js"></script>
+<script src="sw-register.js"></script>
+<script src="install.js"></script>
+</body>
+</html>

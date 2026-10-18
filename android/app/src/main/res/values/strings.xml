@@ -1,5 +1,3 @@
 <resources>
-    <string name="app_name">Scout Desk</string>
-    <string name="desk_url">https://aymankal.github.io/Vanguard-/scout-desk/</string>
-    <string name="offline">You\'re offline. Scout Desk will reload when you\'re back online.</string>
+    <string name="offline">You\'re offline. The app will reload when you\'re back online.</string>
 </resources>

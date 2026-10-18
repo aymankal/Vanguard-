@@ -1,6 +1,7 @@
-# Builds the Scout Desk Android app (android/) and publishes the APK as a GitHub release.
-# Download link that always points at the newest build:
+# Builds the Android apps (android/): Scout Desk for the team and Vanguard (Client Hub) for clients,
+# and publishes both APKs as a GitHub release. Links that always point at the newest build:
 #   https://github.com/aymankal/Vanguard-/releases/latest/download/ScoutDesk.apk
+#   https://github.com/aymankal/Vanguard-/releases/latest/download/VanguardClient.apk
 name: Android app
 on:
   push:
@@ -44,27 +45,34 @@ jobs:
           else
             echo "::warning::No SCOUT_DESK_KEYSTORE_BASE64 secret. Signing with the cached debug key; add a release key before publishing to the Play Store."
           fi
-      - name: Build signed APK
+      - name: Build signed APKs
         working-directory: android
         env:
           SCOUT_DESK_KEYSTORE_PASSWORD: ${{ secrets.SCOUT_DESK_KEYSTORE_PASSWORD }}
           SCOUT_DESK_KEY_ALIAS: ${{ secrets.SCOUT_DESK_KEY_ALIAS }}
           SCOUT_DESK_KEY_PASSWORD: ${{ secrets.SCOUT_DESK_KEY_PASSWORD }}
         run: gradle assembleRelease -PversionCode=${{ github.run_number }} --no-daemon
-      - name: Name the APK
-        run: cp android/app/build/outputs/apk/release/app-release.apk ScoutDesk.apk
+      - name: Name the APKs
+        run: |
+          cp android/app/build/outputs/apk/scoutdesk/release/app-scoutdesk-release.apk ScoutDesk.apk
+          cp android/app/build/outputs/apk/client/release/app-client-release.apk VanguardClient.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: ScoutDesk-${{ github.run_number }}
-          path: ScoutDesk.apk
+          name: Vanguard-apps-${{ github.run_number }}
+          path: |
+            ScoutDesk.apk
+            VanguardClient.apk
       - name: Publish release
         if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: scout-desk-android-${{ github.run_number }}
-          name: Scout Desk for Android (build ${{ github.run_number }})
+          name: Vanguard Android apps (build ${{ github.run_number }})
           body: |
-            Install on Android: download ScoutDesk.apk on the phone, open it, and allow installs from your browser if asked.
+            ScoutDesk.apk is the Vanguard Frontier Scout Desk (team). VanguardClient.apk is the Client Hub (clients).
+            Install on Android: download the APK on the phone, open it, and allow installs from your browser if asked.
             Each build installs over the previous one; your sign-in is kept.
-          files: ScoutDesk.apk
+          files: |
+            ScoutDesk.apk
+            VanguardClient.apk
           make_latest: true
