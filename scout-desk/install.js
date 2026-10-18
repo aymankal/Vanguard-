@@ -5,7 +5,10 @@
   const ua = navigator.userAgent;
   const isIOS = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const isSafari = /^((?!chrome|android|crios|fxios|edgios).)*safari/i.test(ua);
-  const installed = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const isAndroid = /android/i.test(ua);
+  const inAndroidApp = /ScoutDeskAndroid\//.test(ua);
+  const APK_URL = "https://github.com/aymankal/Vanguard-/releases/latest/download/ScoutDesk.apk";
+  const installed = () => inAndroidApp || window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
   let deferred = null;
 
   const buttons = () => document.querySelectorAll("[data-install]");
@@ -28,10 +31,10 @@
       "Scroll and tap <b>Add to Home Screen</b>.",
       "Tap <b>Add</b>. Scout Desk appears on your home screen with the V icon.",
     ];
-    if (/android/i.test(ua)) return [
-      "Tap the <b>⋮</b> menu at the top right of Chrome.",
-      "Tap <b>Install app</b> (or <b>Add to Home screen</b>).",
-      "Tap <b>Install</b>. Scout Desk opens full screen from your home screen.",
+    if (isAndroid) return [
+      "Tap <b>Download the Android app</b> below.",
+      "Open <b>ScoutDesk.apk</b> from the download notification.",
+      "If Android asks, allow installs from your browser, then tap <b>Install</b>. Scout Desk appears with the V icon.",
     ];
     if (isSafari) return [
       "In Safari's menu bar, choose <b>File → Add to Dock</b>.",
@@ -47,11 +50,13 @@
     const ol = document.getElementById("install-steps");
     ol.textContent = "";
     steps().forEach((s) => ol.append(STEP(s)));
+    document.getElementById("install-apk").hidden = !isAndroid;
     document.getElementById("install-sheet").hidden = false;
   }
   function closeSheet() { document.getElementById("install-sheet").hidden = true; }
 
   async function install() {
+    if (isAndroid) { openSheet(); return; }
     if (deferred) {
       const d = deferred; deferred = null;
       d.prompt();
