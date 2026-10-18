@@ -44,6 +44,8 @@ android {
 }
 
 dependencies {
+    // Aligns kotlin-stdlib-jdk7/jdk8 pulled in by AndroidX with kotlin-stdlib (avoids duplicate classes).
+    implementation platform("org.jetbrains.kotlin:kotlin-bom:1.8.22")
     implementation "androidx.activity:activity:1.9.2"
     implementation "androidx.webkit:webkit:1.11.0"
     implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.1.0"
