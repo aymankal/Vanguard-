@@ -7,7 +7,7 @@
   const isSafari = /^((?!chrome|android|crios|fxios|edgios).)*safari/i.test(ua);
   const isAndroid = /android/i.test(ua);
   const inAndroidApp = /VanguardClientAndroid\//.test(ua);
-  const APK_URL = "https://github.com/aymankal/Vanguard-/releases/latest/download/VanguardClient.apk";
+  const APK_URL = "https://github.com/aymankal/Vanguard-/releases/download/vanguard-client-android/VanguardClient.apk";
   const installed = () => inAndroidApp || window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
   let deferred = null;
 

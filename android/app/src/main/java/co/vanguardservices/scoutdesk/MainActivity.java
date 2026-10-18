@@ -30,9 +30,8 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 public class MainActivity extends ComponentActivity {
 
     private static final String DESK_HOST = "aymankal.github.io";
+    private static final String DESK_PATH = "/Vanguard-/scout-desk";
     private static final String SUPABASE_HOST = "awmeixsvltzdspwnamyf.supabase.co";
-    // Which site this build wraps (Scout Desk or the Client Hub); set per flavor in build.gradle.
-    private String deskPath;
 
     private WebView web;
     private SwipeRefreshLayout refresh;
@@ -50,7 +49,6 @@ public class MainActivity extends ComponentActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        deskPath = Uri.parse(getString(R.string.desk_url)).getPath().replaceAll("/$", "");
 
         web = new WebView(this);
         web.setBackgroundColor(Color.parseColor("#0B1220"));
@@ -69,7 +67,7 @@ public class MainActivity extends ComponentActivity {
         s.setAllowContentAccess(false);
         s.setMediaPlaybackRequiresUserGesture(true);
         // Lets the page know it runs inside the app (it hides its own Install buttons).
-        s.setUserAgentString(s.getUserAgentString() + " " + getString(R.string.ua_tag) + "/" + BuildConfigCompat.versionName(this));
+        s.setUserAgentString(s.getUserAgentString() + " ScoutDeskAndroid/" + BuildConfigCompat.versionName(this));
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, false);
 
@@ -149,12 +147,12 @@ public class MainActivity extends ComponentActivity {
         return u != null && isInApp(u) ? u.toString() : getString(R.string.desk_url);
     }
 
-    private boolean isInApp(Uri u) {
+    private static boolean isInApp(Uri u) {
         String host = u.getHost();
         if (host == null || !"https".equals(u.getScheme())) return false;
         if (host.equals(SUPABASE_HOST)) return true;
         String path = u.getPath() == null ? "" : u.getPath();
-        return host.equals(DESK_HOST) && path.startsWith(deskPath);
+        return host.equals(DESK_HOST) && path.startsWith(DESK_PATH);
     }
 
     private void openOutside(Uri u) {

@@ -1,6 +1,6 @@
 # Vanguard Client Hub
 
-The app Vanguard clients use, with the white V icon. Everything is per client company, and a client never sees another company.
+The app Vanguard clients use, with the white V icon. It is a separate app from the Scout Desk (the internal Vanguard Frontier deal desk): its own site, its own data and roles, its own Android app. Everything is per client company, and a client never sees another company.
 
 | Tab | Clients | Vanguard team |
 |---|---|---|
@@ -27,7 +27,7 @@ All of this is enforced in the database with row-level security (`supabase/migra
 
 ## Apps
 - Web: https://aymankal.github.io/Vanguard-/client/ (installable on any phone)
-- Android: https://github.com/aymankal/Vanguard-/releases/latest/download/VanguardClient.apk
+- Android: https://github.com/aymankal/Vanguard-/releases/download/vanguard-client-android/VanguardClient.apk
 
 ## Run locally
 `cd client && python3 -m http.server 8080`, then open http://localhost:8080

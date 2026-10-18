@@ -1,0 +1,52 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "co.vanguardservices.client"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "co.vanguardservices.client"
+        minSdk 24
+        targetSdk 34
+        // CI passes the run number so every build installs over the last one.
+        def buildNumber = (project.findProperty("versionCode") ?: "1").toString().toInteger()
+        versionCode buildNumber
+        versionName "1.0.${buildNumber}"
+    }
+
+    signingConfigs {
+        // The release key comes from CI secrets (see .github/workflows/client-android.yml). It never lives in
+        // the repo. Without it, the build falls back to Android's debug key.
+        release {
+            def ks = System.getenv("VANGUARD_CLIENT_KEYSTORE_PATH")
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv("VANGUARD_CLIENT_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("VANGUARD_CLIENT_KEY_ALIAS")
+                keyPassword System.getenv("VANGUARD_CLIENT_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig System.getenv("VANGUARD_CLIENT_KEYSTORE_PATH") ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // Aligns kotlin-stdlib-jdk7/jdk8 pulled in by AndroidX with kotlin-stdlib (avoids duplicate classes).
+    implementation platform("org.jetbrains.kotlin:kotlin-bom:1.8.22")
+    implementation "androidx.activity:activity:1.9.2"
+    implementation "androidx.webkit:webkit:1.11.0"
+    implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.1.0"
+}

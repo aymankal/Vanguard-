@@ -30,27 +30,6 @@ android {
         }
     }
 
-    // One shell, two apps: the Scout Desk (team) and the Client Hub (clients).
-    flavorDimensions "app"
-    productFlavors {
-        scoutdesk {
-            dimension "app"
-            applicationId "co.vanguardservices.scoutdesk"
-            resValue "string", "app_name", "Scout Desk"
-            resValue "string", "desk_url", "https://aymankal.github.io/Vanguard-/scout-desk/"
-            resValue "string", "ua_tag", "ScoutDeskAndroid"
-            manifestPlaceholders = [deskPath: "/Vanguard-/scout-desk"]
-        }
-        client {
-            dimension "app"
-            applicationId "co.vanguardservices.client"
-            resValue "string", "app_name", "Vanguard"
-            resValue "string", "desk_url", "https://aymankal.github.io/Vanguard-/client/"
-            resValue "string", "ua_tag", "VanguardClientAndroid"
-            manifestPlaceholders = [deskPath: "/Vanguard-/client"]
-        }
-    }
-
     buildTypes {
         release {
             minifyEnabled false
