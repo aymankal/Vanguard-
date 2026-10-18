@@ -1,39 +1,154 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Scout Desk</title>
-  <meta name="description" content="Vanguard Frontier Scout Desk: deal pipeline, founder vetting and investor database for the venture arm of Vanguard Services." />
-  <meta name="theme-color" content="#0B1220" />
-  <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
-  <link rel="icon" href="favicon.ico" sizes="any" />
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="Scout Desk" />
-  <link rel="stylesheet" href="styles.css" />
+  <meta name="description" content="Vanguard Frontier Scout Desk: deal pipeline, founder vetting and investor database for the venture arm of Vanguard Services.">
+  <meta name="theme-color" content="#0B1220">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Scout Desk">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="wrap">
-    <header class="top">
-      <div class="brand"><img class="mark" src="icons/v-mark.png" alt="Vanguard" /><span>Vanguard Services S.A.L</span></div>
-      <button class="btn small" id="installBtn" type="button" hidden>Install app</button>
-    </header>
+<div class="gate" id="gate">
+  <div class="gate-card">
+    <img class="gate-icon" src="icons/icon-192.png" alt="" width="84" height="84">
+    <div class="eyebrow">Vanguard Frontier</div>
+    <h1 class="gate-title">Scout Desk</h1>
+    <div class="spinner" id="gate-loading" role="status" aria-label="Loading"></div>
 
-    <section class="hero">
-      <img class="app-icon" src="icons/icon-192.png" alt="" width="96" height="96" />
+    <form id="auth-form" hidden novalidate>
+      <div class="seg" id="auth-seg" role="tablist" aria-label="Sign in or join">
+        <button type="button" data-m="signin" aria-selected="true">Sign in</button>
+        <button type="button" data-m="signup" aria-selected="false">Join</button>
+      </div>
+      <div class="field" id="f-name" hidden><label for="auth-name">Your name</label><input type="text" id="auth-name" autocomplete="name"></div>
+      <div class="field"><label for="auth-email">Email</label><input type="email" id="auth-email" autocomplete="email" inputmode="email"></div>
+      <div class="field"><label for="auth-pass">Password</label><input type="password" id="auth-pass" autocomplete="current-password"></div>
+      <button class="btn primary" type="submit" id="auth-submit">Sign in</button>
+      <button class="linkbtn" type="button" id="forgot">Forgot password?</button>
+      <p class="help" id="auth-msg" role="status"></p>
+    </form>
+
+    <form id="reset-form" hidden novalidate>
+      <p class="sub" style="text-align:center">Choose a new password.</p>
+      <div class="field"><label for="reset-pass">New password</label><input type="password" id="reset-pass" autocomplete="new-password"></div>
+      <button class="btn primary" type="submit">Save password</button>
+      <p class="help" id="reset-msg" role="status"></p>
+    </form>
+
+    <div id="pending" hidden>
+      <p class="sub">You're signed in as <b id="pending-who"></b>. A partner needs to approve you before the desk opens.</p>
+      <div style="display:flex;gap:10px;justify-content:center;margin-top:16px">
+        <button class="btn primary" type="button" id="pending-check">Check again</button>
+        <button class="btn" type="button" data-signout>Sign out</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap" id="desk" hidden>
+  <header class="top">
+    <div class="top-row">
+      <div class="brand"><img class="mark" src="icons/v-mark.png" alt="Vanguard Services S.A.L logo"><div class="eyebrow">Vanguard Services S.A.L</div></div>
+      <div class="who"><span class="who-name" id="who-name"></span><span class="role" id="role">Connecting…</span><img id="avatar" alt="" hidden><button class="btn small" type="button" data-signout>Sign out</button></div>
+    </div>
+    <div class="hero">
       <h1>Scout Desk</h1>
-      <p class="sub">Deal pipeline, founder vetting and the investor database for Vanguard Frontier.</p>
-      <a class="btn primary big" id="openDesk" href="https://claude.ai/artifact/QUCz4AfkMXFKdqJbQhnVxs">Open Scout Desk</a>
-      <p class="help" id="installHint">Sign in with your Claude account to load live data. Your role (partner, scout, viewer) comes from the desk's Share settings.</p>
+      <div class="fund-meta"><span>$1.5M target fund</span><span>$25K–$35K initial checks</span><span>15–25 companies</span><span>B2B AI · Fintech · SaaS</span></div>
+    </div>
+    <div class="banner" id="banner" hidden></div>
+  </header>
+
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab" role="tab" id="t-pipeline" data-tab="pipeline" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></svg>Pipeline</button>
+    <button class="tab" role="tab" id="t-submit" data-tab="submit" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg>Submit</button>
+    <button class="tab" role="tab" id="t-vetting" data-tab="vetting" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6"/><path d="M16 11l2 2 4-4"/></svg>Vetting</button>
+    <button class="tab" role="tab" id="t-investors" data-tab="investors" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 10l9-6 9 6"/><path d="M5 10v9M10 10v9M14 10v9M19 10v9M3 21h18"/></svg>Investors</button>
+    <button class="tab" role="tab" id="t-queue" data-tab="queue" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 2h6l1-2h5"/></svg><span id="queue-label">Queue</span><span class="count" id="queue-count"></span></button>
+    <button class="tab" role="tab" id="t-about" data-tab="about" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l8 13 8-13"/><path d="M2 6h5M17 6h5"/></svg>About</button>
+  </nav>
+
+  <main>
+    <!-- PIPELINE -->
+    <section class="view" id="view-pipeline">
+      <div class="view-head">
+        <div><h2>Deal pipeline</h2><p class="sub">Approved startups, ranked by Frontier Fit Score. Tap a deal for the full file.</p></div>
+        <div class="searchbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="deal-search" placeholder="Search startup, founder, investor, city" aria-label="Search the pipeline" autocomplete="off"><button class="clear" id="deal-search-clear" type="button" aria-label="Clear search" hidden>✕</button><kbd>/</kbd></div>
+      </div>
+      <div class="strip-scroll"><div class="strip" id="strip"></div></div>
+      <div class="filters" id="sector-filters"></div>
+      <div class="filters" id="who-filters"></div>
+      <details class="how">
+        <summary>How the Frontier Fit Score works (0–100)</summary>
+        <div class="how-grid">
+          <div><b>Sector fit · 25</b>B2B AI, Fintech, SaaS = 25. Tech-enabled services, cyber = 22. Other = 10.</div>
+          <div><b>Stage fit · 20</b>Pre-seed or seed = 20. Series A = 12. Later = 4.</div>
+          <div><b>Traction · 20</b>ARR $100K+ = 20. $25K+ = 17. Any revenue = 14. Customers or pilots = 8. Pre-revenue = 3.</div>
+          <div><b>Founder quality · 35</b>Unvetted = 10. Approved vetting = 10 + average score × 2.5, so a 10/10 founder gets 35.</div>
+        </div>
+      </details>
+      <div class="list" id="deal-list"></div>
     </section>
 
-    <section class="about" id="about" aria-labelledby="about-title">
+    <!-- SUBMIT -->
+    <section class="view" id="view-submit" hidden>
+      <div class="view-head">
+        <div><h2>Submit to the desk</h2><p class="sub">Every submission goes to a partner for review before it enters the pipeline. Your draft saves on this device as you type.</p></div>
+        <div class="seg" role="tablist" aria-label="Submission type">
+          <button type="button" data-form="startup" aria-selected="true">Startup</button>
+          <button type="button" data-form="investor" aria-selected="false">Investor</button>
+          <button type="button" data-form="activity" aria-selected="false">Activity</button>
+        </div>
+      </div>
+      <div id="form-startup-wrap"></div>
+      <div id="form-investor-wrap" hidden></div>
+      <div id="form-activity-wrap" hidden></div>
+    </section>
+
+    <!-- VETTING -->
+    <section class="view" id="view-vetting" hidden>
+      <div class="view-head">
+        <div><h2>Founder vetting</h2><p class="sub">One vetting per founder. Scores feed the Fit Score once a partner approves the vetting.</p></div>
+        <button class="btn primary" id="new-vetting" type="button">New founder vetting</button>
+      </div>
+      <div id="form-vetting-wrap" hidden></div>
+      <div class="filters" id="vet-filters"></div>
+      <div class="searchbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="vet-search" placeholder="Search founder or startup" aria-label="Search vettings" autocomplete="off"><button class="clear" id="vet-search-clear" type="button" aria-label="Clear search" hidden>✕</button></div>
+      <div class="list" id="vet-list"></div>
+    </section>
+
+    <!-- INVESTORS -->
+    <section class="view" id="view-investors" hidden>
+      <div class="view-head">
+        <div><h2>Investor database</h2><p class="sub">Fund-level entries for co-invest and follow-on matching.</p></div>
+        <input type="text" class="search" id="inv-search" placeholder="Search fund, firm, partner" aria-label="Search investors">
+      </div>
+      <div class="filters" id="inv-filters"></div>
+      <div class="filters" id="inv-who-filters"></div>
+      <div class="list" id="inv-list"></div>
+    </section>
+
+    <!-- QUEUE -->
+    <section class="view" id="view-queue" hidden>
+      <div class="view-head"><div><h2 id="queue-title">Review queue</h2><p class="sub" id="queue-sub"></p></div></div>
+      <div id="queue-body" style="display:flex;flex-direction:column;gap:22px"></div>
+    </section>
+
+    <!-- ABOUT -->
+    <section class="view" id="view-about" hidden>
       <div class="about-hero">
         <img class="about-mark" src="icons/v-mark.png" alt="">
         <div class="eyebrow">The venture arm of Vanguard Services S.A.L</div>
-        <h2 id="about-title">Vanguard Frontier</h2>
+        <h2>Vanguard Frontier</h2>
         <p class="sub">We back B2B founders at pre-seed and seed, then help them sell. Vanguard already runs SDR, sales and customer support teams for international clients. Frontier puts that operating muscle behind the companies we invest in.</p>
       </div>
       <div class="about-stats">
@@ -71,8 +186,22 @@
         </div>
       </div>
     </section>
+  </main>
+</div>
+
+<div class="scrim" id="sheet" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <div class="panel-head"><div><div class="eyebrow" id="sheet-eyebrow"></div><h2 id="sheet-title"></h2><div class="meta" id="sheet-meta"></div></div><button class="x" id="sheet-close" type="button" aria-label="Close">✕</button></div>
+    <div class="pbody"><div id="sheet-body" style="display:flex;flex-direction:column;gap:18px"></div><div id="sheet-partner"></div></div>
   </div>
-  <script src="config.js"></script>
-  <script src="app.js"></script>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="vendor/supabase-js-2.117.2.js"></script>
+<script src="config.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script src="auth.js"></script>
+<script src="sw-register.js"></script>
 </body>
 </html>

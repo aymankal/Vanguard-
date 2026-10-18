@@ -35,7 +35,7 @@ services:
       - path: /*
         name: X-Content-Type-Options
         value: nosniff
-  # Scout Desk app (scout-desk/): home-screen launcher and About page for Vanguard Frontier.
+  # Scout Desk app (scout-desk/): the Vanguard Frontier deal desk. Data and sign-in live in Supabase.
   - type: web
     name: vanguard-scout-desk
     runtime: static
@@ -47,7 +47,7 @@ services:
         value: no-cache
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://awmeixsvltzdspwnamyf.supabase.co wss://awmeixsvltzdspwnamyf.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
       - path: /*
         name: X-Content-Type-Options
         value: nosniff
