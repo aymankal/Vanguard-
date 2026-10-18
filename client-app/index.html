@@ -1,0 +1,665 @@
+<title>Vanguard Client Hub</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: app shell. Fixed rail on desktop, bottom tab strip on phones; one panel at a time. */
+:root{
+  --bg:#f3f5f9; --surface:#ffffff; --sunk:#e8ecf3; --line:#d5dbe6;
+  --ink:#0d1726; --muted:#5a6679; --accent:#2348d6; --accent-ink:#ffffff; --signal:#e08a12;
+  --good:#1d8a5a; --bad:#c23b32;
+  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0a0f18; --surface:#121a27; --sunk:#0e1520; --line:#253045;
+  --ink:#e7ecf4; --muted:#93a0b5; --accent:#6f8cff; --accent-ink:#0a0f18; --signal:#f2a640;
+  --good:#3fc68a; --bad:#ff6b5f; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0a0f18; --surface:#121a27; --sunk:#0e1520; --line:#253045;
+  --ink:#e7ecf4; --muted:#93a0b5; --accent:#6f8cff; --accent-ink:#0a0f18; --signal:#f2a640;
+  --good:#3fc68a; --bad:#ff6b5f; color-scheme:dark }
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55}
+*{box-sizing:border-box}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;letter-spacing:-.01em}
+h1{font-size:clamp(28px,4.4vw,44px);font-weight:800;line-height:1.05}
+h2{font-size:22px;font-weight:700}
+h3{font-size:16px;font-weight:700}
+p{margin:0}
+.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+.shell{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100%}
+.rail{position:sticky;top:0;height:100vh;border-right:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;gap:18px;padding:22px 14px}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px}
+.mark{width:34px;height:34px;border-radius:8px;background:var(--ink);color:var(--bg);display:grid;place-items:center;font-family:var(--f-display);font-weight:800;font-size:18px}
+.brand b{font-family:var(--f-display);font-size:17px;display:block;line-height:1.1}
+.brand span{font-family:var(--f-mono);font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
+nav{display:flex;flex-direction:column;gap:2px}
+nav button{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:var(--muted);font-weight:500;font-size:14px}
+nav button svg{width:18px;height:18px;flex:none}
+nav button:hover{background:var(--sunk);color:var(--ink)}
+nav button[aria-current="page"]{background:var(--ink);color:var(--bg)}
+nav button:focus-visible,.btn:focus-visible,.chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.rail-foot{margin-top:auto;font-size:12px;color:var(--muted);padding:0 8px}
+
+main{min-width:0;padding-block:32px 96px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.wrap{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.panel{display:flex;flex-direction:column;gap:22px}
+.head{display:flex;flex-direction:column;gap:8px}
+.head p{max-width:62ch;color:var(--muted)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.stack{display:flex;flex-direction:column;gap:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500;min-width:0}
+input,select,textarea{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%}
+textarea{resize:vertical;min-height:84px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
+input[type=range]{padding:0;accent-color:var(--accent)}
+.btn{all:unset;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;border-radius:8px;font-weight:600;font-size:14px;background:var(--accent);color:var(--accent-ink);white-space:nowrap}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.small{padding:6px 10px;font-size:12.5px}
+.btn[disabled]{opacity:.5;pointer-events:none}
+.chip{all:unset;cursor:pointer;padding:7px 12px;border:1px solid var(--line);border-radius:999px;font-size:13px;background:var(--surface)}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.pill{display:inline-block;font-family:var(--f-mono);font-size:11px;padding:2px 8px;border-radius:999px;background:var(--sunk);color:var(--muted)}
+.pill.good{color:var(--good)} .pill.warn{color:var(--signal)}
+.note{font-size:13px;color:var(--muted);border-left:3px solid var(--signal);padding:6px 0 6px 12px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;z-index:50;max-width:calc(100% - 32px)}
+
+/* Home */
+.hero{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:24px;align-items:end}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.stats div{background:var(--surface);padding:14px}
+.stats b{font-family:var(--f-display);font-size:22px;display:block}
+.stats span{font-size:12px;color:var(--muted)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.tile{all:unset;cursor:pointer;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:6px}
+.tile:hover{border-color:var(--accent)}
+.tile:focus-visible{outline:2px solid var(--accent)}
+.tile b{font-family:var(--f-display);font-size:16px}
+.tile span{font-size:13px;color:var(--muted)}
+.tile .free{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;color:var(--good);text-transform:uppercase}
+
+/* Chat */
+.chat{display:flex;flex-direction:column;height:min(620px,calc(100vh - 220px));min-height:420px;padding:0;overflow:hidden}
+.log{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px}
+.msg{max-width:78ch;min-width:0}
+.msg.me{align-self:flex-end;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:12px 12px 2px 12px}
+.msg.ai{align-self:flex-start}
+.msg.ai .who{font-family:var(--f-mono);font-size:11px;color:var(--accent);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.compose{border-top:1px solid var(--line);padding:12px;display:flex;gap:8px;background:var(--surface)}
+.compose textarea{min-height:44px;height:44px}
+.md p+p,.md ul,.md ol{margin-top:8px}
+.md ul,.md ol{padding-left:20px;margin-bottom:0}
+.md h4{font-family:var(--f-display);font-size:15px;margin:12px 0 4px}
+.md code{font-family:var(--f-mono);font-size:13px;background:var(--sunk);padding:1px 5px;border-radius:4px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.out{background:var(--sunk);border-radius:8px;padding:16px;min-height:120px;white-space:normal;overflow-wrap:anywhere}
+
+/* Quote */
+.quote-total{font-family:var(--f-display);font-size:40px;font-weight:800;line-height:1}
+.line{display:flex;justify-content:space-between;gap:12px;font-size:14px;padding:6px 0;border-bottom:1px dashed var(--line)}
+.line:last-child{border-bottom:0}
+
+/* Booking */
+.days{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.day{all:unset;cursor:pointer;flex:none;width:64px;text-align:center;padding:10px 0;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.day small{display:block;font-family:var(--f-mono);font-size:10.5px;color:var(--muted);text-transform:uppercase}
+.day b{font-family:var(--f-display);font-size:20px}
+.day[aria-pressed="true"],.slot[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.day[aria-pressed="true"] small{color:inherit}
+.slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
+.slot{all:unset;cursor:pointer;text-align:center;padding:8px 0;border:1px solid var(--line);border-radius:8px;font-family:var(--f-mono);font-size:13px}
+.day:focus-visible,.slot:focus-visible{outline:2px solid var(--accent)}
+
+/* CRM */
+.board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(220px,1fr);gap:12px;overflow-x:auto;padding-bottom:6px}
+.col{background:var(--sunk);border-radius:var(--r);padding:10px;display:flex;flex-direction:column;gap:8px;min-height:160px}
+.col h3{font-size:13px;display:flex;justify-content:space-between;align-items:center;padding:2px 4px}
+.deal{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.deal b{font-size:14px}
+.deal select{padding:4px 6px;font-size:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.kpi b{font-family:var(--f-display);font-size:24px;display:block}
+.kpi span{font-size:12px;color:var(--muted)}
+
+/* Quiz */
+.meter{height:6px;background:var(--sunk);border-radius:6px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent);transition:width .3s}
+.opt{all:unset;cursor:pointer;display:block;padding:12px 14px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.opt:hover{border-color:var(--accent)}
+.opt:focus-visible{outline:2px solid var(--accent)}
+.opt.right{border-color:var(--good);color:var(--good);font-weight:600}
+.opt.wrong{border-color:var(--bad);color:var(--bad)}
+.timer{font-family:var(--f-mono);font-size:13px}
+.funnel{display:flex;flex-direction:column;gap:6px}
+.funnel div{display:flex;align-items:center;gap:10px;font-size:13px}
+.funnel i{display:block;height:22px;background:var(--accent);border-radius:4px;min-width:4px}
+.funnel span{white-space:nowrap}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.scroll{overflow-x:auto}
+
+@media (max-width:860px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .rail{position:fixed;top:auto;bottom:0;left:0;right:0;height:auto;flex-direction:row;padding:6px max(8px, env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px, env(safe-area-inset-left,0px));border-right:0;border-top:1px solid var(--line);z-index:20}
+  .brand,.rail-foot{display:none}
+  nav{flex-direction:row;overflow-x:auto;gap:4px;width:100%}
+  nav button{flex-direction:column;gap:3px;font-size:10.5px;padding:7px 9px;flex:none}
+  .hero{grid-template-columns:minmax(0,1fr)}
+  main{padding-block:20px 110px}
+  .chat{height:calc(100vh - 230px)}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="shell">
+  <aside class="rail">
+    <div class="brand"><div class="mark">V</div><div><b>Vanguard</b><span>Client Hub</span></div></div>
+    <nav id="nav" aria-label="Sections"></nav>
+    <div class="rail-foot">Vanguard Services SAL<br>Beirut · serving clients worldwide</div>
+  </aside>
+  <main><div class="wrap" id="view"></div></main>
+</div>
+
+<script>
+/* ============================================================
+   EDIT HERE: company facts the AI uses, and quote rates.
+   Everything the assistant says about Vanguard comes from KB.
+   ============================================================ */
+const CONFIG = {
+  company: "Vanguard Services SAL",
+  contactEmail: "",            // e.g. sales@yourdomain.com — shown when a request can't be saved
+  timezone: "Asia/Beirut",
+  callSlots: ["10:00","10:30","11:00","11:30","12:00","14:00","14:30","15:00","15:30","16:00","16:30","17:00"],
+  // Indicative monthly rates in USD. Replace with your real price list.
+  rates: { sdr: 2400, support: 1600, closer: 3200, manager: 1500, setup: 1500, dataPerSeat: 150 },
+  termDiscount: { 3: 0, 6: 0.05, 12: 0.10 }
+};
+
+const KB = `
+COMPANY: Vanguard Services SAL, an outsourcing and BPO company headquartered in Beirut, Lebanon, serving international clients (US, Europe, GCC and beyond).
+
+SERVICES:
+1. Outsourced SDR teams: dedicated Sales Development Reps who prospect, run cold calling, cold email and LinkedIn outreach, qualify leads and book meetings straight onto the client's AEs' calendars.
+2. Sales outsourcing: full-cycle support from list building and lead generation to appointment setting and, where needed, closers and account follow-up.
+3. Customer support: inbound/outbound support agents for chat, email and phone, multilingual (English, Arabic, French), working the client's time zone.
+4. Lead generation and data: ICP definition, list building and enrichment with Apollo and similar tools, data hygiene.
+5. Sales operations: CRM setup and hygiene (HubSpot), sequences, reporting dashboards, automation.
+
+HOW WE WORK:
+- Lean, execution-first, measured on outcomes: meetings booked, pipeline created, response times, CSAT.
+- Typical stack: HubSpot (CRM), Apollo (data and sequences), Notion (playbooks and reporting), automation platforms.
+- Onboarding: discovery call, ICP and messaging workshop, playbook and scripts, list build, launch in roughly 2–3 weeks, weekly reporting and a monthly review.
+- Teams are managed by Vanguard: hiring, training, QA, call reviews and performance management are included.
+- Clients get time-zone coverage, cost efficiency versus hiring in-house in US/EU markets, and a team that is ramped faster because the playbook exists already.
+- Contracts are typically month-to-month after an initial term; longer terms get better rates.
+
+WHY CLIENTS PICK US:
+- Cost: a fully managed SDR seat costs a fraction of a US/EU in-house hire once salary, benefits, tools, recruiting and management time are counted.
+- Speed: no 3–6 month hiring and ramp cycle.
+- Accountability: clear weekly KPIs and transparent reporting.
+
+FREE OFFERS IN THIS HUB: instant quote estimate, book a discovery call, AI sales copilot, free lightweight CRM, free business plan consultation, SDR reality quiz.
+
+RULES FOR YOU: Never invent client names, case studies, guarantees, certifications, headcount or exact prices. For pricing, point to the Quote tab (an indicative estimate) and the discovery call (final pricing). If you don't know something, say a Vanguard specialist will confirm it on a call.`;
+
+/* ============================================================ */
+
+const $ = (s, el=document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = n => "$" + Math.round(n).toLocaleString("en-US");
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const store = { get(k,d){ try{ const v=localStorage.getItem("vg:"+k); return v?JSON.parse(v):d }catch{ return d } },
+                set(k,v){ try{ localStorage.setItem("vg:"+k, JSON.stringify(v)) }catch{} } };
+function toast(t){ const d=document.createElement("div"); d.className="toast"; d.textContent=t; document.body.append(d); setTimeout(()=>d.remove(),2600) }
+async function copy(text, btn){ try{ await navigator.clipboard.writeText(text); toast("Copied") }catch{ toast("Select the text and copy it manually") } }
+
+function md(src){
+  const lines = esc(src).split("\n"); let html="", list=null;
+  const inline = s => s.replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/`([^`]+)`/g,"<code>$1</code>").replace(/(^|\s)\*(\S.+?)\*/g,"$1<i>$2</i>");
+  const close = () => { if(list){ html += `</${list}>`; list=null } };
+  for(const l of lines){
+    let m;
+    if((m=l.match(/^#{1,4}\s+(.*)/))){ close(); html+=`<h4>${inline(m[1])}</h4>` }
+    else if((m=l.match(/^\s*[-*•]\s+(.*)/))){ if(list!=="ul"){close(); html+="<ul>"; list="ul"} html+=`<li>${inline(m[1])}</li>` }
+    else if((m=l.match(/^\s*\d+[.)]\s+(.*)/))){ if(list!=="ol"){close(); html+="<ol>"; list="ol"} html+=`<li>${inline(m[1])}</li>` }
+    else if(!l.trim()){ close() }
+    else { close(); html+=`<p>${inline(l)}</p>` }
+  }
+  close(); return html;
+}
+
+/* ---------- Runtime capabilities (all optional) ---------- */
+const cap = { sample:null, db:null, user:null, uid:null, owner:false };
+const ready = (async () => {
+  if(!window.claude?.use) return;
+  const [s,d,u] = await Promise.all([claude.use("sample"), claude.use("db"), claude.use("user")]);
+  cap.sample=s; cap.db=d; cap.user=u;
+  if(u){ try{ cap.uid = await u.id(); cap.owner = await u.isOwner() }catch{} }
+  renderNav(); if(current==="inbox"||current==="crm") show(current);
+})();
+
+async function ask(prompt, onText, tier="default"){
+  if(!cap.sample) throw {code:"not_granted", message:"AI is not available in this view. Open the hub signed in to claude.ai and allow AI access."};
+  const input = typeof prompt==="string" ? prompt : prompt;
+  const r = await cap.sample(input, { cache:false, modelTier:tier, onText: ({text}) => onText?.(text) });
+  return r.text;
+}
+function aiError(e){ return e?.code==="rate_limited" ? "Too many requests right now. Wait a minute and try again." : (e?.message || "The AI request failed. Try again.") }
+
+/* Requests (quotes, calls, consults) go to the Vanguard inbox */
+async function submitRequest(kind, payload){
+  const doc = { kind, ...payload, status:"new", createdAt:new Date().toISOString() };
+  const mine = store.get("requests", []); mine.unshift(doc); store.set("requests", mine);
+  if(cap.db && cap.uid){
+    try{
+      await cap.db.doc(`inbox/${cap.uid}`).set({ name:payload.name||"", email:payload.email||"", company:payload.company||"", lastAt:doc.createdAt });
+      await cap.db.doc(`inbox/${cap.uid}/requests/${uid()}`).set(doc);
+      return { saved:true };
+    }catch(e){ return { saved:false, error:e } }
+  }
+  return { saved:false };
+}
+function requestSummary(kind, p){ return [`Vanguard request: ${kind}`, ...Object.entries(p).filter(([,v])=>v!==""&&v!=null).map(([k,v])=>`${k}: ${typeof v==="object"?JSON.stringify(v):v}`)].join("\n") }
+function confirmBox(res, kind, p){
+  const text = requestSummary(kind,p);
+  if(res.saved) return `<div class="card stack"><span class="pill good">Request sent</span><h3>Thanks, ${esc(p.name||"")}. Vanguard has your ${esc(kind.toLowerCase())}.</h3><p class="muted">A specialist replies by email to <b>${esc(p.email)}</b>, usually within one business day.</p></div>`;
+  return `<div class="card stack"><span class="pill warn">Not sent from this view</span><h3>Copy your request and send it to Vanguard</h3>
+    <p class="muted">This view can't deliver requests (you may be signed out or have view-only access). ${CONFIG.contactEmail?`Email it to <b class="mono">${esc(CONFIG.contactEmail)}</b>.`:"Send it to your Vanguard contact."}</p>
+    <pre class="out mono" style="white-space:pre-wrap;font-size:12.5px">${esc(text)}</pre><div class="row"><button class="btn ghost small" data-copy>Copy request</button></div></div>`;
+}
+
+/* ---------- Navigation ---------- */
+const ICONS = {
+  home:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  ask:'<path d="M4 5h16v11H8l-4 4z"/><path d="M8 10h8M8 13h5"/>',
+  quote:'<path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7M9 8h3"/>',
+  book:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  copilot:'<path d="M12 3l2.5 5.5L20 11l-5.5 2.5L12 19l-2.5-5.5L4 11l5.5-2.5z"/>',
+  crm:'<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="7" rx="1"/>',
+  plan:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  quiz:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/>',
+  inbox:'<path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/>'
+};
+const SECTIONS = [
+  ["home","Home"],["ask","Ask Vanguard"],["quote","Get a quote"],["book","Book a call"],
+  ["copilot","Copilot"],["crm","Free CRM"],["plan","Plan consult"],["quiz","SDR quiz"],["inbox","Inbox"]
+];
+let current = (location.hash||"").slice(1) || "home";
+function renderNav(){
+  $("#nav").innerHTML = SECTIONS.filter(([id])=>id!=="inbox"||cap.owner).map(([id,l])=>
+    `<button data-go="${id}" ${id===current?'aria-current="page"':""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICONS[id]}</svg>${l}</button>`).join("");
+}
+function show(id){
+  if(!VIEWS[id]) id="home";
+  current=id; try{ history.replaceState(null,"","#"+id) }catch{}
+  renderNav(); const v=$("#view"); v.innerHTML=""; VIEWS[id](v); window.scrollTo(0,0);
+}
+document.addEventListener("click", e => {
+  const g = e.target.closest("[data-go]"); if(g){ show(g.dataset.go); return }
+  const c = e.target.closest("[data-copy]"); if(c){ const t = c.closest(".card,.msg")?.querySelector("pre,.md,.out"); copy(t?.innerText||"", c) }
+});
+
+/* ---------- Views ---------- */
+const VIEWS = {};
+
+VIEWS.home = v => {
+  v.innerHTML = `<section class="panel">
+    <div class="hero">
+      <div class="head"><span class="eyebrow">Vanguard Services · Beirut</span>
+        <h1>Your sales floor, <em>built and run</em> for you.</h1>
+        <p>Outsourced SDR teams, sales outsourcing and customer support for international companies. Ask anything about how we work, price a team in a minute, or use our free sales tools.</p>
+        <div class="row" style="margin-top:8px"><button class="btn" data-go="quote">Get a quote</button><button class="btn ghost" data-go="book">Book a call</button></div>
+      </div>
+      <div class="stats"><div><b>2–3 wks</b><span>typical launch</span></div><div><b>3</b><span>languages: EN · AR · FR</span></div><div><b>Weekly</b><span>KPI reporting</span></div></div>
+    </div>
+    <div class="tiles">
+      <button class="tile" data-go="ask"><b>Ask Vanguard</b><span>AI concierge trained on our services, process and stack.</span></button>
+      <button class="tile" data-go="quote"><b>Instant quote</b><span>Size an SDR or support team and see an indicative monthly cost.</span></button>
+      <button class="tile" data-go="book"><b>Book a discovery call</b><span>30 minutes with a Vanguard specialist, Beirut time.</span></button>
+      <button class="tile" data-go="copilot"><span class="free">Free</span><b>Sales copilot</b><span>Cold emails, call scripts, objection handling, ICP.</span></button>
+      <button class="tile" data-go="crm"><span class="free">Free</span><b>Lean CRM</b><span>A pipeline board for your deals, with AI next steps.</span></button>
+      <button class="tile" data-go="plan"><span class="free">Free</span><b>Business plan consult</b><span>Get a go-to-market draft now, a review call after.</span></button>
+      <button class="tile" data-go="quiz"><b>SDR reality quiz</b><span>Ten questions. See why good SDRs are hard to find.</span></button>
+    </div>
+    <div class="card stack"><span class="eyebrow">What we do</span>
+      <div class="grid3">
+        <div class="stack" style="gap:4px"><h3>SDR teams</h3><p class="muted">Calls, email and LinkedIn outreach that books qualified meetings onto your AEs' calendars.</p></div>
+        <div class="stack" style="gap:4px"><h3>Sales outsourcing</h3><p class="muted">List building, lead gen, appointment setting and follow-up, run end to end.</p></div>
+        <div class="stack" style="gap:4px"><h3>Customer support</h3><p class="muted">Chat, email and phone agents working your hours, in English, Arabic and French.</p></div>
+        <div class="stack" style="gap:4px"><h3>Sales ops</h3><p class="muted">HubSpot setup, Apollo sequences, dashboards and automation.</p></div>
+      </div></div>
+  </section>`;
+};
+
+/* Ask Vanguard: concierge chat */
+let chat = store.get("chat", []);
+VIEWS.ask = v => {
+  v.innerHTML = `<section class="panel">
+    <div class="head"><span class="eyebrow">AI concierge</span><h2>Ask Vanguard</h2><p>Services, process, onboarding, pricing approach, tools. Answers come from Vanguard's own brief.</p></div>
+    <div class="row" id="chips">${["What does an outsourced SDR team include?","How fast can you launch?","How do you report results?","Do you do customer support in Arabic?","Is it cheaper than hiring in-house?"].map(q=>`<button class="chip">${esc(q)}</button>`).join("")}</div>
+    <div class="card chat"><div class="log" id="log"></div>
+      <form class="compose" id="cf"><textarea id="cq" placeholder="Ask about Vanguard…" aria-label="Your question"></textarea><button class="btn" id="cs">Send</button></form></div>
+    <div class="row"><button class="btn ghost small" id="clr">Clear conversation</button></div>
+  </section>`;
+  const log=$("#log",v);
+  const ACT = {quote:["Get a quote","quote"],book:["Book a call","book"],plan:["Free plan consult","plan"],crm:["Open free CRM","crm"],copilot:["Open copilot","copilot"],quiz:["Take the SDR quiz","quiz"]};
+  const bubble = (m) => {
+    if(m.role==="user") return `<div class="msg me">${esc(m.content)}</div>`;
+    const acts=[...new Set((m.content.match(/\[\[(\w+)\]\]/g)||[]).map(x=>x.slice(2,-2)))].filter(a=>ACT[a]);
+    const body=m.content.replace(/\[\[\w+\]\]/g,"").trim();
+    return `<div class="msg ai"><div class="who">Vanguard</div><div class="md">${md(body)}</div>${acts.length?`<div class="actions">${acts.map(a=>`<button class="btn small" data-go="${ACT[a][1]}">${ACT[a][0]}</button>`).join("")}</div>`:""}</div>`;
+  };
+  const draw = () => { log.innerHTML = (chat.length?chat:[{role:"assistant",content:"Hi, I'm the Vanguard concierge. Ask me how our SDR, sales outsourcing or support teams work, or tell me about your business and I'll suggest a setup. [[quote]] [[book]]"}]).map(bubble).join(""); log.scrollTop=log.scrollHeight };
+  draw();
+  const send = async q => {
+    q=q.trim(); if(!q) return; $("#cq",v).value="";
+    chat.push({role:"user",content:q}); draw();
+    const el=document.createElement("div"); el.className="msg ai"; el.innerHTML=`<div class="who">Vanguard</div><div class="md muted">Thinking…</div>`; log.append(el); log.scrollTop=log.scrollHeight;
+    const pre = `You are the client concierge for Vanguard Services SAL. Be direct, concise and helpful, like a senior account executive. Use short paragraphs or bullets. Ground every fact in this brief:\n${KB}\n\nWhen it helps the visitor, end with one or two action tags from: [[quote]] [[book]] [[plan]] [[crm]] [[copilot]] [[quiz]]. Tags render as buttons; don't explain them.\n\nVisitor's first message:\n`;
+    const msgs = chat.slice(-12).map((m,i)=>({role:m.role==="user"?"user":"assistant",content:m.content}));
+    if(msgs[0].role!=="user") msgs.shift();
+    msgs[0] = {role:"user", content: pre + msgs[0].content};
+    try{
+      const t = await ask(msgs, text => { $(".md",el).classList.remove("muted"); $(".md",el).innerHTML = md(text.replace(/\[\[\w+\]\]/g,"")); log.scrollTop=log.scrollHeight });
+      chat.push({role:"assistant",content:t}); store.set("chat",chat); draw();
+    }catch(e){ $(".md",el).innerHTML = `<p style="color:var(--bad)">${esc(aiError(e))}</p>`; chat.pop(); }
+  };
+  $("#cf",v).addEventListener("submit", e => { e.preventDefault(); send($("#cq",v).value) });
+  $("#cq",v).addEventListener("keydown", e => { if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); send($("#cq",v).value) } });
+  $("#chips",v).addEventListener("click", e => { const b=e.target.closest(".chip"); if(b) send(b.textContent) });
+  $("#clr",v).onclick = () => { chat=[]; store.set("chat",chat); draw() };
+};
+
+/* Quote */
+VIEWS.quote = v => {
+  const R=CONFIG.rates;
+  v.innerHTML = `<section class="panel">
+    <div class="head"><span class="eyebrow">Instant estimate</span><h2>Get a quote</h2><p>Size your team. The estimate updates as you go; send it and a specialist confirms final pricing.</p></div>
+    <div class="grid2">
+      <form class="card stack" id="qf">
+        <label>SDRs (outbound prospecting) <span class="row"><input type="range" id="q_sdr" min="0" max="20" value="2"><b class="mono" id="q_sdr_v">2</b></span></label>
+        <label>Support agents <span class="row"><input type="range" id="q_sup" min="0" max="30" value="0"><b class="mono" id="q_sup_v">0</b></span></label>
+        <label>Closers / account executives <span class="row"><input type="range" id="q_clo" min="0" max="10" value="0"><b class="mono" id="q_clo_v">0</b></span></label>
+        <div class="grid2" style="gap:12px">
+          <label>Term<select id="q_term"><option value="3">3 months</option><option value="6" selected>6 months</option><option value="12">12 months</option></select></label>
+          <label>Coverage<select id="q_hours"><option value="business">Your business hours</option><option value="extended">Extended (+15%)</option></select></label>
+        </div>
+        <label class="row" style="flex-direction:row;font-weight:400"><input type="checkbox" id="q_data" checked style="width:auto"> Include lead data and tooling (Apollo, sequences)</label>
+        <label class="row" style="flex-direction:row;font-weight:400"><input type="checkbox" id="q_mgr" checked style="width:auto"> Dedicated team lead and QA</label>
+        <hr style="border:0;border-top:1px solid var(--line);width:100%">
+        <div class="grid2" style="gap:12px">
+          <label>Name<input id="q_name" required autocomplete="name"></label>
+          <label>Work email<input id="q_email" type="email" required autocomplete="email"></label>
+          <label>Company<input id="q_company" autocomplete="organization"></label>
+          <label>Target market<input id="q_market" placeholder="e.g. US mid-market SaaS"></label>
+        </div>
+        <label>Anything else<textarea id="q_notes" placeholder="Goals, current pipeline, timeline"></textarea></label>
+        <button class="btn">Send quote request</button>
+      </form>
+      <div class="stack">
+        <div class="card stack"><span class="eyebrow">Estimated monthly cost</span><div class="quote-total mono" id="q_total">$0</div><div id="q_lines"></div>
+          <p class="note">Indicative only. Final pricing depends on markets, languages and volumes and is confirmed on your discovery call.</p></div>
+        <div id="q_done"></div>
+      </div>
+    </div></section>`;
+  const val = id => $("#"+id,v);
+  const calc = () => {
+    const s=+val("q_sdr").value, su=+val("q_sup").value, c=+val("q_clo").value, term=+val("q_term").value;
+    ["q_sdr","q_sup","q_clo"].forEach(i=>val(i+"_v").textContent=val(i).value);
+    const seats=s+su+c, ext = val("q_hours").value==="extended" ? 1.15 : 1;
+    const lines=[];
+    if(s) lines.push([`${s} × SDR`, s*R.sdr*ext]);
+    if(su) lines.push([`${su} × support agent`, su*R.support*ext]);
+    if(c) lines.push([`${c} × closer`, c*R.closer*ext]);
+    if(val("q_data").checked && (s+c)) lines.push([`Data and tooling`, (s+c)*R.dataPerSeat]);
+    if(val("q_mgr").checked && seats) lines.push([`Team lead and QA`, R.manager*Math.ceil(seats/8)]);
+    let sub=lines.reduce((a,[,n])=>a+n,0); const disc=sub*(CONFIG.termDiscount[term]||0);
+    if(disc) lines.push([`${term}-month term discount`, -disc]);
+    const total=sub-disc;
+    val("q_total").textContent = fmt(total);
+    val("q_lines").innerHTML = lines.map(([k,n])=>`<div class="line"><span>${k}</span><span class="mono">${n<0?"−"+fmt(-n):fmt(n)}</span></div>`).join("") + (seats?`<div class="line"><span>One-time setup</span><span class="mono">${fmt(R.setup)}</span></div>`:"");
+    return {sdrs:s,support:su,closers:c,term:`${term} months`,coverage:val("q_hours").value,data:val("q_data").checked,teamLead:val("q_mgr").checked,estimateMonthly:Math.round(total),setup:seats?R.setup:0};
+  };
+  val("qf").addEventListener("input", calc); calc();
+  val("qf").addEventListener("submit", async e => {
+    e.preventDefault(); const est=calc();
+    const p={name:val("q_name").value,email:val("q_email").value,company:val("q_company").value,market:val("q_market").value,notes:val("q_notes").value,...est};
+    const res=await submitRequest("Quote request",p); val("q_done").innerHTML=confirmBox(res,"Quote request",p);
+  });
+};
+
+/* Book a call */
+VIEWS.book = v => {
+  const days=[]; const d=new Date(); d.setHours(12,0,0,0);
+  while(days.length<10){ d.setDate(d.getDate()+1); const w=d.getDay(); if(w!==0&&w!==6) days.push(new Date(d)) }
+  let pick={day:null,slot:null};
+  v.innerHTML = `<section class="panel">
+    <div class="head"><span class="eyebrow">Discovery call · 30 min</span><h2>Book a call</h2><p>Pick a slot in Beirut time (${esc(CONFIG.timezone)}). We confirm by email with a meeting link.</p></div>
+    <div class="grid2">
+      <div class="card stack"><h3>1. Choose a day</h3><div class="days" id="days">${days.map((x,i)=>`<button class="day" data-i="${i}" aria-pressed="false"><small>${x.toLocaleDateString("en-US",{weekday:"short"})}</small><b>${x.getDate()}</b><small>${x.toLocaleDateString("en-US",{month:"short"})}</small></button>`).join("")}</div>
+        <h3>2. Choose a time <span class="muted mono" style="font-size:12px;font-weight:400">Beirut</span></h3><div class="slots" id="slots">${CONFIG.callSlots.map(s=>`<button class="slot" aria-pressed="false">${s}</button>`).join("")}</div>
+        <p class="muted mono" id="tzhint" style="font-size:12px"></p></div>
+      <form class="card stack" id="bf"><h3>3. Your details</h3>
+        <label>Name<input id="b_name" required autocomplete="name"></label>
+        <label>Work email<input id="b_email" type="email" required autocomplete="email"></label>
+        <label>Company<input id="b_company" autocomplete="organization"></label>
+        <label>Topic<select id="b_topic"><option>Outsourced SDR team</option><option>Sales outsourcing</option><option>Customer support team</option><option>Sales ops / CRM setup</option><option>Something else</option></select></label>
+        <label>What should we prepare?<textarea id="b_notes"></textarea></label>
+        <p id="b_sel" class="mono" style="font-size:13px">No slot selected</p>
+        <button class="btn" id="b_go" disabled>Request this slot</button>
+        <div id="b_done"></div>
+      </form>
+    </div></section>`;
+  const upd=()=>{ const ok=pick.day!=null&&pick.slot; $("#b_go",v).disabled=!ok;
+    $("#b_sel",v).textContent = ok ? `${days[pick.day].toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})} · ${pick.slot} Beirut` : "No slot selected";
+    $("#tzhint",v).textContent = `Your time zone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`; };
+  $("#days",v).onclick=e=>{const b=e.target.closest(".day"); if(!b) return; v.querySelectorAll(".day").forEach(x=>x.setAttribute("aria-pressed","false")); b.setAttribute("aria-pressed","true"); pick.day=+b.dataset.i; upd()};
+  $("#slots",v).onclick=e=>{const b=e.target.closest(".slot"); if(!b) return; v.querySelectorAll(".slot").forEach(x=>x.setAttribute("aria-pressed","false")); b.setAttribute("aria-pressed","true"); pick.slot=b.textContent; upd()};
+  upd();
+  $("#bf",v).addEventListener("submit", async e=>{ e.preventDefault();
+    const p={name:$("#b_name",v).value,email:$("#b_email",v).value,company:$("#b_company",v).value,topic:$("#b_topic",v).value,notes:$("#b_notes",v).value,
+      date:days[pick.day].toISOString().slice(0,10),time:pick.slot+" Beirut",visitorTimezone:Intl.DateTimeFormat().resolvedOptions().timeZone};
+    const res=await submitRequest("Call booking",p); $("#b_done",v).innerHTML=confirmBox(res,"Call booking",p);
+  });
+};
+
+/* Copilot */
+const MODES = {
+  email:{label:"Cold email",ph:"Who are you emailing and what do you sell? e.g. VP Sales at a 200-person US logistics SaaS; we sell outsourced SDR teams.",
+    task:"Write a cold email sequence: 1 first-touch email (under 120 words) and 2 short follow-ups. Give 3 subject line options. Plain, specific, no hype, one clear call to action."},
+  script:{label:"Call script",ph:"Who are you calling, what's the offer, what's the goal of the call?",
+    task:"Write a cold call script: permission-based opener, 2-line reason for calling, 3 discovery questions, a meeting ask, and short responses to the 3 most likely brush-offs."},
+  objection:{label:"Objection handler",ph:"Paste the objection, e.g. 'We already work with an agency' or 'Send me an email'.",
+    task:"Handle this sales objection. Explain what the prospect likely means, give 2 response options word for word (acknowledge, question, reframe), and a follow-up question to keep the conversation going."},
+  icp:{label:"ICP builder",ph:"Describe your product, best customers so far and price point.",
+    task:"Build an Ideal Customer Profile: firmographics, buyer personas (titles, pains, triggers), disqualifiers, and an Apollo-style filter list (industries, headcount, titles, locations, keywords)."},
+  linkedin:{label:"LinkedIn message",ph:"Who's the prospect and what's the hook?",
+    task:"Write a LinkedIn connection note (under 280 characters) and two follow-up messages after acceptance. Conversational, no pitch in the first note."},
+  followup:{label:"Meeting follow-up",ph:"Paste your call notes.",
+    task:"Turn these call notes into a follow-up email with a recap, agreed next steps with owners and dates, and a one-line internal CRM note."}
+};
+VIEWS.copilot = v => {
+  let mode = store.get("cpMode","email");
+  v.innerHTML = `<section class="panel">
+    <div class="head"><span class="eyebrow">Free tool</span><h2>Sales copilot</h2><p>The playbook our SDRs use, as a tool. Pick a job, describe the situation, get copy you can send today.</p></div>
+    <div class="row" id="modes"></div>
+    <div class="grid2">
+      <form class="card stack" id="cpf"><label id="cpl">Situation<textarea id="cpi" rows="7"></textarea></label>
+        <label>Tone<select id="cpt"><option>Direct and professional</option><option>Warm and conversational</option><option>Bold and punchy</option></select></label>
+        <button class="btn" id="cpb">Generate</button></form>
+      <div class="card stack"><div class="row" style="justify-content:space-between"><span class="eyebrow">Output</span><button class="btn ghost small" data-copy>Copy</button></div><div class="out md" id="cpo"><p class="muted">Your draft appears here.</p></div></div>
+    </div>
+    <div class="card row" style="justify-content:space-between"><p>Want a team that sends this at volume, every day?</p><button class="btn small" data-go="quote">Price an SDR team</button></div>
+  </section>`;
+  const drawModes=()=>{ $("#modes",v).innerHTML=Object.entries(MODES).map(([k,m])=>`<button class="chip" data-m="${k}" style="${k===mode?"background:var(--ink);color:var(--bg);border-color:var(--ink)":""}">${m.label}</button>`).join(""); $("#cpi",v).placeholder=MODES[mode].ph };
+  drawModes();
+  $("#modes",v).onclick=e=>{const b=e.target.closest("[data-m]"); if(b){ mode=b.dataset.m; store.set("cpMode",mode); drawModes() }};
+  $("#cpf",v).addEventListener("submit", async e=>{ e.preventDefault(); const inp=$("#cpi",v).value.trim(); if(!inp){ $("#cpi",v).focus(); return }
+    const out=$("#cpo",v), btn=$("#cpb",v); btn.disabled=true; out.innerHTML=`<p class="muted">Writing…</p>`;
+    try{ await ask(`You are a senior SDR coach at Vanguard Services, an outsourced SDR and sales agency. ${MODES[mode].task}\nTone: ${$("#cpt",v).value}.\nUse markdown headings and lists where useful. Use [brackets] for details the user must fill in; never invent statistics or customer names.\n\nSituation:\n${inp}`, t=>out.innerHTML=md(t)) }
+    catch(err){ out.innerHTML=`<p style="color:var(--bad)">${esc(aiError(err))}</p>` }
+    btn.disabled=false;
+  });
+};
+
+/* Free CRM */
+const STAGES=["Lead","Contacted","Meeting","Proposal","Won","Lost"];
+let crm = { deals: store.get("crm", null), unsub:null, remote:false };
+VIEWS.crm = v => {
+  v.innerHTML = `<section class="panel">
+    <div class="head"><span class="eyebrow">Free tool</span><h2>Lean CRM</h2><p>A simple pipeline for founders and small sales teams. Your deals are private to you.</p>
+      <p class="mono" style="font-size:12px" id="crmwhere"></p></div>
+    <div class="kpis" id="kpis"></div>
+    <details class="card" id="addbox"><summary style="cursor:pointer;font-weight:600">Add a deal</summary>
+      <form id="df" class="stack" style="margin-top:14px"><div class="grid3">
+        <label>Contact<input id="d_name" required></label><label>Company<input id="d_co"></label><label>Email<input id="d_email" type="email"></label>
+        <label>Value (USD/yr)<input id="d_val" type="number" min="0" step="100"></label><label>Stage<select id="d_stage">${STAGES.map(s=>`<option>${s}</option>`).join("")}</select></label><label>Next step<input id="d_next" placeholder="e.g. Send proposal Tue"></label></div>
+        <label>Notes<textarea id="d_notes"></textarea></label><div class="row"><button class="btn">Add deal</button></div></form></details>
+    <div class="board" id="board"></div>
+    <div class="card stack"><div class="row" style="justify-content:space-between"><h3>AI pipeline review</h3><button class="btn small" id="crmai">Review my pipeline</button></div><div class="md" id="crmout"><p class="muted">Get prioritized next steps for every open deal.</p></div></div>
+  </section>`;
+  const col = () => cap.db && cap.uid ? cap.db.collection(`data/users/${cap.uid}/deals`) : null;
+  $("#crmwhere",v).textContent = col() ? "Saved to your Vanguard Hub account (only you can see it)." : "Saved in this browser only. Sign in to claude.ai to keep it across devices.";
+  if(crm.deals==null){ crm.deals=[
+    {id:"ex1",name:"Example: Sara Haddad",company:"Example Logistics Co.",value:18000,stage:"Meeting",next:"Demo Thursday",notes:"Sample deal, delete me",at:Date.now()},
+    {id:"ex2",name:"Example: Mark Klein",company:"Example SaaS GmbH",value:36000,stage:"Proposal",next:"Follow up on pricing",notes:"Sample deal",at:Date.now()},
+    {id:"ex3",name:"Example: Lina Aoun",company:"Example Retail",value:9000,stage:"Lead",next:"First call",notes:"Sample deal",at:Date.now()} ] }
+  const draw = () => {
+    const ds=crm.deals, open=ds.filter(d=>!["Won","Lost"].includes(d.stage));
+    const won=ds.filter(d=>d.stage==="Won"), lost=ds.filter(d=>d.stage==="Lost");
+    $("#kpis",v).innerHTML = [[open.length,"open deals"],[fmt(open.reduce((a,d)=>a+(+d.value||0),0)),"open pipeline"],[fmt(won.reduce((a,d)=>a+(+d.value||0),0)),"won"],[(won.length+lost.length)?Math.round(100*won.length/(won.length+lost.length))+"%":"–","win rate"]].map(([b,s])=>`<div class="kpi"><b class="mono">${b}</b><span>${s}</span></div>`).join("");
+    $("#board",v).innerHTML = STAGES.map(s=>{ const items=ds.filter(d=>d.stage===s); return `<div class="col"><h3>${s}<span class="pill">${items.length}</span></h3>${items.map(d=>`<div class="deal"><b>${esc(d.name)}</b><span class="muted">${esc(d.company||"")}</span>${d.value?`<span class="mono">${fmt(d.value)}</span>`:""}${d.next?`<span>→ ${esc(d.next)}</span>`:""}<div class="row" style="justify-content:space-between"><select data-id="${d.id}" aria-label="Stage">${STAGES.map(x=>`<option ${x===d.stage?"selected":""}>${x}</option>`).join("")}</select><button class="btn ghost small" data-del="${d.id}">Delete</button></div></div>`).join("")}</div>` }).join("");
+  };
+  const persistLocal = () => { if(!crm.remote) store.set("crm", crm.deals) };
+  const write = async d => { const c=col(); if(c){ try{ await c.doc(d.id).set(d) }catch{ toast("Couldn't save to your account; saved in this browser"); crm.remote=false; persistLocal() } } else persistLocal() };
+  const remove = async id => { const c=col(); if(c){ try{ await c.doc(id).delete() }catch{} } persistLocal() };
+  if(col() && !crm.unsub){
+    crm.unsub = col().orderBy("at","desc").onSnapshot(snap=>{ crm.remote=true; crm.deals=snap.docs.map(x=>({id:x.id,...x.data()})); if(current==="crm") draw() }, ()=>{ crm.remote=false });
+  }
+  draw();
+  $("#df",v).addEventListener("submit", async e=>{ e.preventDefault();
+    const d={id:uid(),name:$("#d_name",v).value,company:$("#d_co",v).value,email:$("#d_email",v).value,value:+$("#d_val",v).value||0,stage:$("#d_stage",v).value,next:$("#d_next",v).value,notes:$("#d_notes",v).value,at:Date.now()};
+    if(!crm.remote) crm.deals.unshift(d); e.target.reset(); draw(); await write(d); toast("Deal added") });
+  $("#board",v).addEventListener("change", async e=>{ const s=e.target.closest("select[data-id]"); if(!s) return; const d=crm.deals.find(x=>x.id===s.dataset.id); if(!d) return; d.stage=s.value; draw(); await write({...d}) });
+  $("#board",v).addEventListener("click", async e=>{ const b=e.target.closest("[data-del]"); if(!b) return; crm.deals=crm.deals.filter(x=>x.id!==b.dataset.del); draw(); await remove(b.dataset.del) });
+  $("#crmai",v).onclick = async () => { const out=$("#crmout",v); out.innerHTML=`<p class="muted">Reviewing…</p>`;
+    const rows=crm.deals.map(d=>`- ${d.name} | ${d.company} | ${d.stage} | $${d.value} | next: ${d.next} | notes: ${d.notes}`).join("\n");
+    try{ await ask(`You are a sales manager reviewing a small B2B pipeline. For each open deal give one concrete next action with a deadline, flag stalled deals, and finish with the 3 priorities for this week. Be brief. Pipeline:\n${rows}`, t=>out.innerHTML=md(t), "quick") }
+    catch(err){ out.innerHTML=`<p style="color:var(--bad)">${esc(aiError(err))}</p>` } };
+};
+
+/* Business plan consult */
+VIEWS.plan = v => {
+  v.innerHTML = `<section class="panel">
+    <div class="head"><span class="eyebrow">Free consultation</span><h2>Business plan consult</h2><p>Tell us where you are. You get a go-to-market draft instantly, and a Vanguard strategist reviews it with you on a free call.</p></div>
+    <div class="grid2">
+      <form class="card stack" id="pf">
+        <div class="grid2" style="gap:12px">
+          <label>Name<input id="p_name" required autocomplete="name"></label><label>Work email<input id="p_email" type="email" required autocomplete="email"></label>
+          <label>Company<input id="p_company"></label><label>Industry<input id="p_ind" placeholder="e.g. B2B SaaS, logistics"></label>
+          <label>Stage<select id="p_stage"><option>Idea / pre-revenue</option><option>Early revenue (&lt;$500k)</option><option>Growing ($500k–$5M)</option><option>Scaling ($5M+)</option></select></label>
+          <label>Target market<input id="p_mkt" placeholder="e.g. US, UK, GCC"></label>
+        </div>
+        <label>What do you sell, and to whom?<textarea id="p_what" required></textarea></label>
+        <label>Main goal for the next 12 months<input id="p_goal" placeholder="e.g. $1M new ARR, 40 meetings/month"></label>
+        <label>Biggest challenge right now<textarea id="p_ch"></textarea></label>
+        <button class="btn" id="pb">Get my draft and request the consult</button>
+      </form>
+      <div class="stack"><div id="p_done"></div>
+        <div class="card stack"><div class="row" style="justify-content:space-between"><span class="eyebrow">Your go-to-market draft</span><button class="btn ghost small" data-copy>Copy</button></div><div class="out md" id="po"><p class="muted">Fill in the form and your draft appears here: positioning, ICP, channels, sales team plan, 90-day milestones and KPIs.</p></div></div></div>
+    </div></section>`;
+  $("#pf",v).addEventListener("submit", async e=>{ e.preventDefault(); const g=id=>$("#"+id,v).value;
+    const p={name:g("p_name"),email:g("p_email"),company:g("p_company"),industry:g("p_ind"),stage:g("p_stage"),market:g("p_mkt"),offer:g("p_what"),goal:g("p_goal"),challenge:g("p_ch")};
+    $("#pb",v).disabled=true;
+    const res=await submitRequest("Business plan consult",p); $("#p_done",v).innerHTML=confirmBox(res,"Business plan consult",p);
+    const out=$("#po",v); out.innerHTML=`<p class="muted">Drafting your plan…</p>`;
+    try{ await ask(`You are a go-to-market strategist at Vanguard Services (outsourced SDR teams, sales outsourcing, customer support). Write a concise one-page go-to-market draft for this company with these sections: Positioning, Ideal Customer Profile, Channels and outbound motion, Sales team plan (in-house vs outsourced, with headcount), 90-day milestones, KPIs to track, Risks. Be specific and practical. Don't invent market statistics; mark assumptions as assumptions. End with 3 questions to discuss on the consult call.\n\nCompany: ${p.company}\nIndustry: ${p.industry}\nStage: ${p.stage}\nMarket: ${p.market}\nOffer: ${p.offer}\nGoal: ${p.goal}\nChallenge: ${p.challenge}`, t=>out.innerHTML=md(t), "complex") }
+    catch(err){ out.innerHTML=`<p style="color:var(--bad)">${esc(aiError(err))}</p>` }
+    $("#pb",v).disabled=false;
+  });
+};
+
+/* SDR quiz */
+const QUIZ = [
+  {q:"Out of 100 cold dials, how many typically reach a live decision-maker?",o:["40–50","20–30","Under 10","About 60"],a:2,x:"Most dials hit voicemail, gatekeepers or wrong numbers. Single-digit connect rates are normal."},
+  {q:"A typical reply rate on cold email to a well-built list is…",o:["15–25%","1–5%","30%+","10–15%"],a:1,x:"Low single digits is the norm. Volume, targeting and copy all have to be right."},
+  {q:"How many touches does it usually take to book a meeting with a cold prospect?",o:["1–2","3–4","8 or more","Exactly 5"],a:2,x:"Meetings usually come after many touches across phone, email and LinkedIn. Most reps quit far earlier."},
+  {q:"An inbound lead fills in your form. When should someone call?",o:["Within 5 minutes","Same day","Within 48 hours","Next weekly sync"],a:0,x:"Speed to lead is decisive. Qualification odds drop sharply after the first few minutes."},
+  {q:"Roughly how much B2B contact data goes stale every year?",o:["Under 5%","About 10%","20–30%","None, if bought from a vendor"],a:2,x:"People change jobs, titles and emails constantly. Lists need constant re-verification."},
+  {q:"How long does a new in-house SDR usually take to reach full productivity?",o:["1 week","About 3 months","1 year","They're productive on day one"],a:1,x:"Ramp time plus recruiting time means months before a new hire pays off."},
+  {q:"The prospect says “Just send me an email.” The best move is to…",o:["Say thanks and hang up","Agree, then ask one question so the email is relevant and set a time to follow up","Push for a meeting anyway","Send a generic brochure"],a:1,x:"It's usually a brush-off. Earning one more answer turns it into a real next step."},
+  {q:"An active phone-based SDR typically makes how many dials a day?",o:["10–20","50–100","300+","Only when leads come in"],a:1,x:"Consistent daily volume, every day, plus research, emails and CRM updates."},
+  {q:"“We already work with someone for this.” Best first response?",o:["Offer a discount","Ask what they'd improve about the current setup","Argue your product is better","End the call"],a:1,x:"Curiosity beats pitching. Find the gap before you position against the incumbent."},
+  {q:"Average SDR tenure in a role is roughly…",o:["5+ years","About 1.5 years","3 years","Over a decade"],a:1,x:"Short tenure means constant rehiring and re-ramping. This is where most in-house teams lose momentum."}
+];
+VIEWS.quiz = v => {
+  let i=0, score=0, start=Date.now(), locked=false, timer;
+  const finish = () => {
+    clearInterval(timer); const secs=Math.round((Date.now()-start)/1000);
+    const best=store.get("quizBest",0); if(score>best) store.set("quizBest",score);
+    const verdict = score>=8 ? "You think like a seasoned SDR. Now imagine doing that 80 times a day." : score>=5 ? "Solid instincts. The gap between knowing and doing it daily is where teams win or lose." : "This is why outbound is hard, and why most in-house teams stall.";
+    v.innerHTML = `<section class="panel"><div class="head"><span class="eyebrow">Result</span><h2 class="mono">${score} / ${QUIZ.length}</h2><p>${verdict}</p><p class="muted mono" style="font-size:12px">Finished in ${secs}s · Best ${Math.max(best,score)}/${QUIZ.length}</p></div>
+      <div class="card stack"><h3>One SDR day, in numbers</h3><p class="muted">Illustrative, using typical benchmark ranges. Results vary by market and list quality.</p>
+        <div class="funnel">${[[80,"dials"],[6,"live conversations"],[2,"qualified interest"],[1,"meeting booked"]].map(([n,l])=>`<div><i style="width:${Math.max(4,n/80*100)}%"></i><span class="mono">${n}</span><span>${l}</span></div>`).join("")}</div>
+        <p>Every one of those dials needs research, a sharp opener, objection handling and a CRM update. Vanguard runs this daily, with trained reps, tested scripts and weekly reporting.</p>
+        <div class="row"><button class="btn" data-go="quote">Price an SDR team</button><button class="btn ghost" data-go="book">Talk to us</button><button class="btn ghost" id="again">Try again</button></div></div></section>`;
+    $("#again",v).onclick=()=>VIEWS.quiz(v);
+  };
+  const draw = () => {
+    const it=QUIZ[i]; locked=false;
+    v.innerHTML = `<section class="panel"><div class="head"><span class="eyebrow">SDR reality quiz</span><h2>Could you hit quota?</h2><p>Ten questions on lead gen and outbound. Most people get fewer than half right.</p></div>
+      <div class="card stack"><div class="row" style="justify-content:space-between"><span class="mono">Question ${i+1} of ${QUIZ.length}</span><span class="timer" id="tm"></span></div>
+        <div class="meter"><i style="width:${i/QUIZ.length*100}%"></i></div>
+        <h3 style="font-size:19px">${esc(it.q)}</h3>
+        <div class="stack" style="gap:8px" id="opts">${it.o.map((o,k)=>`<button class="opt" data-k="${k}">${esc(o)}</button>`).join("")}</div>
+        <p id="ex" class="note" hidden></p>
+        <div class="row" style="justify-content:space-between"><span class="mono muted">Score ${score}</span><button class="btn" id="nx" hidden>${i+1<QUIZ.length?"Next question":"See my result"}</button></div></div></section>`;
+    $("#opts",v).onclick=e=>{ const b=e.target.closest(".opt"); if(!b||locked) return; locked=true; const k=+b.dataset.k;
+      v.querySelectorAll(".opt").forEach((x,j)=>{ if(j===it.a) x.classList.add("right"); else if(j===k) x.classList.add("wrong") });
+      if(k===it.a) score++; const ex=$("#ex",v); ex.textContent=(k===it.a?"Correct. ":"Not quite. ")+it.x; ex.hidden=false; $("#nx",v).hidden=false; $("#nx",v).focus() };
+    $("#nx",v).onclick=()=>{ i++; i<QUIZ.length?draw():finish() };
+  };
+  timer=setInterval(()=>{ const t=$("#tm",v); if(t) t.textContent=Math.round((Date.now()-start)/1000)+"s"; else clearInterval(timer) },1000);
+  draw();
+};
+
+/* Owner inbox */
+VIEWS.inbox = async v => {
+  v.innerHTML = `<section class="panel"><div class="head"><span class="eyebrow">Vanguard team only</span><h2>Inbox</h2><p>Quote requests, call bookings and consult requests from clients using the hub.</p></div><div class="card scroll" id="ib"><p class="muted">Loading requests…</p></div></section>`;
+  await ready;
+  const box=$("#ib",v);
+  if(!cap.owner||!cap.db){ box.innerHTML=`<p class="muted">Only the hub's owner can see requests.</p>`; return }
+  try{
+    const people=(await cap.db.collection("inbox").get()).docs;
+    const all=[];
+    for(const p of people){ const rs=(await cap.db.collection(`inbox/${p.id}/requests`).get()).docs; rs.forEach(r=>all.push({path:`inbox/${p.id}/requests/${r.id}`,...r.data()})) }
+    all.sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||""));
+    if(!all.length){ box.innerHTML=`<p class="muted">No requests yet. They appear here when a client sends a quote, booking or consult request.</p>`; return }
+    box.innerHTML=`<table><thead><tr><th>When</th><th>Type</th><th>Client</th><th>Details</th><th>Status</th></tr></thead><tbody>${all.map(r=>{
+      const skip=["kind","name","email","company","status","createdAt","path"]; const det=Object.entries(r).filter(([k,x])=>!skip.includes(k)&&x!==""&&x!=null&&x!==false).map(([k,x])=>`<b>${esc(k)}</b>: ${esc(x)}`).join("<br>");
+      return `<tr><td class="mono">${esc((r.createdAt||"").slice(0,16).replace("T"," "))}</td><td>${esc(r.kind)}</td><td>${esc(r.name)}<br><span class="muted mono">${esc(r.email)}</span><br>${esc(r.company)}</td><td style="min-width:220px">${det}</td>
+        <td><select data-p="${esc(r.path)}">${["new","contacted","booked","won","closed"].map(s=>`<option ${s===r.status?"selected":""}>${s}</option>`).join("")}</select></td></tr>` }).join("")}</tbody></table>`;
+    box.onchange=async e=>{ const s=e.target.closest("select[data-p]"); if(!s) return; try{ await cap.db.doc(s.dataset.p).update({status:s.value}); toast("Status updated") }catch{ toast("Couldn't update status") } };
+  }catch(e){ box.innerHTML=`<p style="color:var(--bad)">Couldn't load requests: ${esc(e.message||e.code||"")}</p>` }
+};
+
+show(current);
+</script>
