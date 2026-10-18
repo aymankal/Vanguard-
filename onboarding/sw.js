@@ -1,6 +1,6 @@
 /* Service worker: makes Vanguard Onboarding installable from Chrome and lets it open offline.
    Network-first so every deploy shows up immediately. Submissions (another origin) are never cached. */
-const CACHE = "vanguard-onboarding-v1";
+const CACHE = "vanguard-onboarding-v2";
 const SHELL = ["./", "styles.css", "app.js", "kb.js", "config.js", "icons/logo.png", "icons/icon-192.png"];
 
 self.addEventListener("install", (event) => {
