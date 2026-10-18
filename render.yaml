@@ -35,3 +35,19 @@ services:
       - path: /*
         name: X-Content-Type-Options
         value: nosniff
+  # Scout Desk app (scout-desk/): home-screen launcher and About page for Vanguard Frontier.
+  - type: web
+    name: vanguard-scout-desk
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: ./scout-desk
+    headers:
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff

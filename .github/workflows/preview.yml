@@ -1,11 +1,11 @@
 # Publishes the app (the web/ folder) as a live preview on GitHub Pages,
-# with the client onboarding app (onboarding/) at /onboarding/.
+# with the client onboarding app (onboarding/) at /onboarding/ and the Scout Desk app (scout-desk/) at /scout-desk/.
 # It talks to the same Supabase project as the real site, so sign-in and data are real.
 name: Preview
 on:
   push:
     branches: [claude/crm-note-taker-improvements-3hw1c6]
-    paths: [web/**, onboarding/**, .github/workflows/preview.yml]
+    paths: [web/**, onboarding/**, scout-desk/**, .github/workflows/preview.yml]
   workflow_dispatch:
 permissions:
   contents: read
@@ -30,6 +30,7 @@ jobs:
           mkdir -p _site
           cp -r web/. _site/
           cp -r onboarding _site/onboarding
+          cp -r scout-desk _site/scout-desk
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

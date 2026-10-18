@@ -1,6 +1,6 @@
 # Vanguard Docs (v0.9.0 beta)
 
-> Also in this repo: **[Lean CRM](lean-crm/README.md)**, a minimal AI-assisted CRM (`lean-crm/`), and **[Vanguard Onboarding](onboarding/README.md)**, the client onboarding app (`onboarding/`).
+> Also in this repo: **[Lean CRM](lean-crm/README.md)**, a minimal AI-assisted CRM (`lean-crm/`), **[Vanguard Onboarding](onboarding/README.md)**, the client onboarding app (`onboarding/`), and **[Scout Desk](scout-desk/README.md)**, the Vanguard Frontier app (`scout-desk/`).
 
 <img src="web/logo.png" alt="Vanguard" width="72" />
 
