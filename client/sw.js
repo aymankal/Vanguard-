@@ -1,8 +1,8 @@
 /* Service worker: makes the Client Hub installable from Chrome and lets the launcher open offline.
    Network-first and revalidated so every deploy shows up on the next open. Data requests (Supabase, another origin) are never cached. */
-const CACHE = "vanguard-client-v1";
+const CACHE = "vanguard-client-v2";
 const SHELL = ["./", "styles.css", "client.css", "app.js", "auth.js", "data.js", "config.js", "sw-register.js", "install.js",
-  "vendor/supabase-js-2.117.2.js", "icons/v-mark-white.png", "icons/icon-192.png"];
+  "vendor/supabase-js-2.117.2.js", "icons/v-mark-orange.png", "icons/icon-192.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {}));

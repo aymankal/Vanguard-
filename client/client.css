@@ -96,3 +96,6 @@ div.deal-card:hover{transform:none;box-shadow:var(--shadow)}
 
 /* 7 tabs on phones */
 @media (max-width:719px){.tab{font-size:9.5px;padding:6px 2px}.tab svg{width:19px;height:19px}}
+
+/* The Client Hub's V is orange in both themes (the Scout Desk keeps the white V). */
+.brand .mark,.about-mark{filter:none!important}
