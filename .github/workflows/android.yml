@@ -1,4 +1,5 @@
 # Builds the Scout Desk Android app (android/) and publishes the APK as a GitHub release.
+# The Client Hub app is separate: see client-android.yml.
 # Download link that always points at the newest build:
 #   https://github.com/aymankal/Vanguard-/releases/latest/download/ScoutDesk.apk
 name: Android app

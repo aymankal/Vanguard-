@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">Vanguard</string>
+    <string name="desk_url">https://aymankal.github.io/Vanguard-/client/</string>
+    <string name="ua_tag">VanguardClientAndroid</string>
+    <string name="offline">You\'re offline. Vanguard will reload when you\'re back online.</string>
+</resources>
