@@ -110,6 +110,25 @@
     return () => sb.removeChannel(ch);
   }
 
+  /* ---------- import (partners) ---------- */
+  // Loads a desk export ({ collection: [{ id, data }] }) and upserts it in batches.
+  const IMPORTABLE = ["deals", "investors", "vettings", "activity", "reviews", "partner_notes"];
+  async function importDocs(payload, onProgress) {
+    const rows = [];
+    for (const [c, docs] of Object.entries(payload || {})) {
+      const col = COL(c);
+      if (!IMPORTABLE.includes(col) || !Array.isArray(docs)) continue;
+      for (const d of docs) if (d && d.id && d.data && typeof d.data === "object") rows.push({ collection: col, id: String(d.id), data: d.data });
+    }
+    if (!rows.length) throw Object.assign(new Error("No desk records in that file"), { code: "empty" });
+    for (let i = 0; i < rows.length; i += 100) {
+      const { error } = await sb.from("scout_docs").upsert(rows.slice(i, i + 100), { onConflict: "collection,id" });
+      fail(error);
+      onProgress && onProgress(Math.min(i + 100, rows.length), rows.length);
+    }
+    return rows.length;
+  }
+
   /* ---------- auth ---------- */
   async function join(name) {
     const { data, error } = await sb.rpc("scout_join", { p_name: name || "" });
@@ -118,5 +137,5 @@
     return data;
   }
 
-  window.ScoutData = { sb, db, user, people, loadTeam, setRole, removeMember, watchTeam, join };
+  window.ScoutData = { sb, db, user, people, loadTeam, setRole, removeMember, watchTeam, join, importDocs };
 })();
