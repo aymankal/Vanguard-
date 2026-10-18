@@ -321,6 +321,11 @@
     });
     $$("[data-edit]", app).forEach((b) => b.addEventListener("click", () => { S.step = +b.dataset.edit; save(); renderIntake(); window.scrollTo({ top: 0 }); }));
     $("#send", app)?.addEventListener("click", submit);
+    const on = $(".steps button.on", app);
+    if (on && on.parentElement.parentElement.scrollWidth > on.parentElement.parentElement.clientWidth) {
+      on.scrollIntoView({ block: "nearest", inline: "center" });
+      window.scrollTo(0, 0);
+    }
   }
 
   function reviewHtml() {
@@ -420,10 +425,12 @@
     const days = KB.PROCESS.filter((p) => p.phase === "onboard" && p.id !== "intake" && p.id !== "gate");
     app.innerHTML = `
       <section class="next">
-        <div class="next-main">
+        <header class="next-head">
           <p class="eyebrow">Step 2 · Next steps</p>
           <h1>${S.sent ? "Received" : "Saved"}${first() ? `, ${escHtml(first())}` : ""}. Here's what happens next.</h1>
           <p class="lead">Your Account Lead reviews your answers and sends them back to you in writing to sign off. Nobody works from assumptions.</p>
+        </header>
+        <div class="next-main">
 
           <ol class="timeline">
             <li class="done"><span class="dot">✓</span><div><b>Intake submitted</b><p>${new Date(S.submittedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</p></div></li>
