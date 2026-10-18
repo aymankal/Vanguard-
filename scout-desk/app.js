@@ -491,6 +491,17 @@ function accessBlock(){
     tb.append(h("tr",null,h("td",null,(m.name||"—")+(isMe?" (you)":""),h("div",{class:"help"},m.email)),h("td",{style:"min-width:150px"},sel),h("td",null,rm)));
   }
   box.append(h("table",null,tb));
+  const file=h("input",{type:"file",accept:"application/json,.json",hidden:true});
+  const status=h("span",{class:"help"});
+  file.addEventListener("change",async()=>{
+    const f=file.files[0]; file.value=""; if(!f) return;
+    try{
+      status.textContent="Reading "+f.name+"…";
+      const n=await D.importDocs(JSON.parse(await f.text()),(done,total)=>{ status.textContent="Imported "+done+" of "+total+"…"; });
+      status.textContent=""; toast("Imported "+n+" records");
+    }catch(err){ status.textContent=""; if(err instanceof SyntaxError||err.code==="empty") toast("That file isn't a Scout Desk export"); else writeError(err); }
+  });
+  box.append(h("div",{class:"actions",style:"margin-top:14px;align-items:center"},h("button",{class:"btn small",type:"button",on:{click:()=>file.click()}},"Import desk data"),status,file));
   return box;
 }
 
