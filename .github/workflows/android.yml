@@ -6,11 +6,13 @@ on:
   push:
     branches: [claude/crm-note-taker-improvements-3hw1c6]
     paths: [android/**, .github/workflows/android.yml]
+  pull_request:
+    paths: [android/**, .github/workflows/android.yml]
   workflow_dispatch:
 permissions:
   contents: write
 concurrency:
-  group: android
+  group: android-${{ github.ref }}
   cancel-in-progress: false
 jobs:
   build:
@@ -56,6 +58,7 @@ jobs:
           name: ScoutDesk-${{ github.run_number }}
           path: ScoutDesk.apk
       - name: Publish release
+        if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: scout-desk-android-${{ github.run_number }}
