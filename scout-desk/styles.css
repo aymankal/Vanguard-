@@ -340,3 +340,14 @@ mark{background:var(--brass-soft);color:inherit;border-radius:4px;padding:0 2px}
 .brand .mark,.about-mark{filter:brightness(0)}
 :root[data-theme="dark"] .brand .mark,:root[data-theme="dark"] .about-mark{filter:none}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .brand .mark,:root:not([data-theme="light"]) .about-mark{filter:none}}
+
+/* install */
+.install-btn{gap:5px;padding-inline:12px}
+.install-btn svg,.install-big svg{width:15px;height:15px;flex:none}
+.install-big{gap:8px;margin-top:6px;min-height:44px;padding-inline:22px}
+.install-steps{margin:0;padding-left:22px;display:grid;gap:12px;font-size:15px;color:var(--ink)}
+.install-steps b{font-weight:600}
+.install-panel{height:auto;max-height:100%;align-self:center}
+@media (max-width:719px){.install-panel{height:auto;align-self:flex-end}}
+.install-panel .pbody{align-items:flex-start}
+@media (max-width:420px){.install-btn span{display:none}.install-btn{padding-inline:10px}}

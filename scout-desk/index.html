@@ -36,6 +36,7 @@
       <button class="linkbtn" type="button" id="forgot">Forgot password?</button>
       <p class="help" id="auth-msg" role="status"></p>
     </form>
+    <button class="btn install-big" type="button" data-install hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Install the app</span></button>
 
     <form id="reset-form" hidden novalidate>
       <p class="sub" style="text-align:center">Choose a new password.</p>
@@ -58,7 +59,7 @@
   <header class="top">
     <div class="top-row">
       <div class="brand"><img class="mark" src="icons/v-mark-white.png" alt="Vanguard Services S.A.L logo"><div class="eyebrow">Vanguard Services S.A.L</div></div>
-      <div class="who"><span class="who-name" id="who-name"></span><span class="role" id="role">Connecting…</span><img id="avatar" alt="" hidden><button class="btn small" type="button" data-signout>Sign out</button></div>
+      <div class="who"><span class="who-name" id="who-name"></span><span class="role" id="role">Connecting…</span><img id="avatar" alt="" hidden><button class="btn small primary install-btn" type="button" data-install hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Install</span></button><button class="btn small" type="button" data-signout>Sign out</button></div>
     </div>
     <div class="hero">
       <h1>Scout Desk</h1>
@@ -175,6 +176,11 @@
           <li><b>Invested</b>GTM support from Vanguard starts.</li>
         </ol>
       </div>
+      <div class="about-card install-card" data-install-card hidden>
+        <h3>Get the app</h3>
+        <p>Install Scout Desk on your phone or computer. It opens full screen from your home screen with the V icon, and stays signed in.</p>
+        <button class="btn primary" type="button" data-install style="margin-top:14px">Install app</button>
+      </div>
       <div class="about-card">
         <h3>Team</h3>
         <div class="about-team">
@@ -196,6 +202,16 @@
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div class="scrim" id="install-sheet" hidden>
+  <div class="panel install-panel" role="dialog" aria-modal="true" aria-labelledby="install-title">
+    <div class="panel-head"><div><div class="eyebrow">Scout Desk</div><h2 id="install-title">Install the app</h2></div><button class="x" type="button" data-install-close aria-label="Close">✕</button></div>
+    <div class="pbody">
+      <img class="gate-icon" src="icons/icon-192.png" alt="" width="72" height="72" style="width:72px;height:72px">
+      <ol class="install-steps" id="install-steps"></ol>
+      <button class="btn primary" type="button" data-install-close>Got it</button>
+    </div>
+  </div>
+</div>
 <div class="scroll-count" id="scroll-count" aria-live="off" hidden><b class="num" id="sc-at">0</b><span class="sc-of">of <span class="num" id="sc-total">0</span> <span id="sc-noun">startups</span></span></div>
 
 <script src="vendor/supabase-js-2.117.2.js"></script>
@@ -204,5 +220,6 @@
 <script src="app.js"></script>
 <script src="auth.js"></script>
 <script src="sw-register.js"></script>
+<script src="install.js"></script>
 </body>
 </html>
