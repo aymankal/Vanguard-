@@ -1,10 +1,11 @@
-# Publishes the app (the web/ folder) as a live preview on GitHub Pages.
+# Publishes the app (the web/ folder) as a live preview on GitHub Pages,
+# with the client onboarding app (onboarding/) at /onboarding/.
 # It talks to the same Supabase project as the real site, so sign-in and data are real.
 name: Preview
 on:
   push:
     branches: [claude/crm-note-taker-improvements-3hw1c6]
-    paths: [web/**, .github/workflows/preview.yml]
+    paths: [web/**, onboarding/**, .github/workflows/preview.yml]
   workflow_dispatch:
 permissions:
   contents: read
@@ -24,8 +25,13 @@ jobs:
       - uses: actions/configure-pages@v5
         with:
           enablement: true
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          cp -r web/. _site/
+          cp -r onboarding _site/onboarding
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: web
+          path: _site
       - id: deploy
         uses: actions/deploy-pages@v4
