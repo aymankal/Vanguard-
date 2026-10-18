@@ -19,3 +19,19 @@ services:
       - path: /*
         name: Referrer-Policy
         value: strict-origin-when-cross-origin
+  # Client onboarding app (onboarding/). Intakes are emailed through FormSubmit.
+  - type: web
+    name: vanguard-onboarding
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: ./onboarding
+    headers:
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://formsubmit.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self' mailto:"
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
