@@ -600,11 +600,40 @@ function renderVetSheet(){
 }
 function copy(t){ try{ navigator.clipboard.writeText(t).then(()=>toast("Copied"),()=>toast("Select the address to copy it")); }catch(e){ toast("Select the address to copy it"); } }
 
+/* ---------- scroll counter ---------- */
+// Floating "12 of 98" pill on Pipeline and Investors: the total, plus how far down the list you are.
+const COUNTED={pipeline:{list:"deal-list",item:".deal",total:"deal-total",one:"startup",many:"startups"},
+  investors:{list:"inv-list",item:".inv",total:"inv-total",one:"investor",many:"investors"}};
+let scRaf=0, scHide=0, scLast=-1;
+function currentTab(){ const v=[...document.querySelectorAll("section.view")].find(s=>!s.hidden); return v?v.id.replace("view-",""):""; }
+function updateCounter(){
+  cancelAnimationFrame(scRaf);
+  scRaf=requestAnimationFrame(()=>{
+    for(const k in COUNTED){ const c=COUNTED[k], n=document.querySelectorAll("#"+c.list+" "+c.item).length; $(c.total).textContent=n?String(n):""; }
+    const pill=$("scroll-count"), c=COUNTED[currentTab()];
+    if(!c){ pill.hidden=true; return; }
+    const items=[...document.querySelectorAll("#"+c.list+" "+c.item)];
+    if(!items.length){ pill.hidden=true; return; }
+    const line=window.innerHeight*0.6; let at=0;
+    for(const el of items){ if(el.getBoundingClientRect().top<line) at++; else break; }
+    at=Math.max(1,at);
+    pill.hidden=false;
+    if(at!==scLast){ scLast=at; $("sc-at").textContent=String(at); pill.classList.remove("tick"); void pill.offsetWidth; pill.classList.add("tick"); }
+    $("sc-total").textContent=String(items.length);
+    $("sc-noun").textContent=items.length===1?c.one:c.many;
+    pill.classList.add("active"); clearTimeout(scHide); scHide=setTimeout(()=>pill.classList.remove("active"),1200);
+  });
+}
+window.addEventListener("scroll",updateCounter,{passive:true});
+window.addEventListener("resize",updateCounter);
+for(const k in COUNTED) new MutationObserver(updateCounter).observe($(COUNTED[k].list),{childList:true});
+
 /* ---------- navigation ---------- */
 function go(tab){
   document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected",String(t.dataset.tab===tab)));
   document.querySelectorAll("section.view").forEach(s=>s.hidden=s.id!=="view-"+tab);
   window.scrollTo(0,0);
+  scLast=-1; updateCounter();
 }
 function pickForm(k){
   document.querySelectorAll(".seg button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.form===k)));
