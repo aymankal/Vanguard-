@@ -11,8 +11,9 @@ android {
         minSdk 24
         targetSdk 34
         // CI passes the run number so every build installs over the last one.
-        versionCode (project.findProperty("versionCode") ?: "1") as int
-        versionName "1.0." + (project.findProperty("versionCode") ?: "1")
+        def buildNumber = (project.findProperty("versionCode") ?: "1").toString().toInteger()
+        versionCode buildNumber
+        versionName "1.0.${buildNumber}"
     }
 
     signingConfigs {

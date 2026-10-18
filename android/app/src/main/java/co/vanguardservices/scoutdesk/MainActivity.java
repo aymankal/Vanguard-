@@ -120,16 +120,14 @@ public class MainActivity extends ComponentActivity {
             }
         });
 
+        // A confirmation or password-reset link tapped while the app is already open.
+        addOnNewIntentListener(intent -> {
+            Uri u = intent.getData();
+            if (u != null && isInApp(u)) web.loadUrl(u.toString());
+        });
+
         if (savedInstanceState != null) web.restoreState(savedInstanceState);
         else web.loadUrl(startUrl(getIntent()));
-    }
-
-    @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        // A confirmation or password-reset link tapped while the app is open.
-        Uri u = intent.getData();
-        if (u != null && isInApp(u)) web.loadUrl(u.toString());
     }
 
     @Override
