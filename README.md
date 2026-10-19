@@ -1,6 +1,6 @@
 # Vanguard Docs (v0.9.0 beta)
 
-> Also in this repo: **[Lean CRM](lean-crm/README.md)**, a minimal AI-assisted CRM (`lean-crm/`), **[Vanguard Onboarding](onboarding/README.md)**, the client onboarding app (`onboarding/`), **[Scout Desk](scout-desk/README.md)**, the Vanguard Frontier app (`scout-desk/`), **[Client Hub](client/README.md)**, the app clients use for reports, pipeline, pilots and chat (`client/`), and **[Vanguard AI](desktop-ai/README.md)**, a desktop app for Claude, GPT, Gemini and offline local models (`desktop-ai/`).
+> Also in this repo: **[Lean CRM](lean-crm/README.md)**, a minimal AI-assisted CRM (`lean-crm/`), **[Vanguard Onboarding](onboarding/README.md)**, the client onboarding app (`onboarding/`), **[Scout Desk](scout-desk/README.md)**, the Vanguard Frontier app (`scout-desk/`), **[Client Hub](client/README.md)**, the app clients use for reports, pipeline, pilots and chat (`client/`), and **[Vanguard AI](desktop-ai/README.md)**, a desktop app for Claude, GPT, Gemini and offline local models (`desktop-ai/`) with an [Android version](android-ai/README.md) (`android-ai/`).
 
 <img src="web/logo.png" alt="Vanguard" width="72" />
 

@@ -22,6 +22,10 @@ const RECOMMENDED = [
 ];
 
 let app = null; // state from the main process
+// Phones: Enter adds a new line and the Send button sends.
+const touch = matchMedia('(pointer: coarse)').matches;
+// On Android, offline models run inside the app instead of through Ollama.
+const onDevice = () => app?.local?.kind === 'device';
 let chats = [];
 let current = null;
 let pending = []; // docs attached before the first message of a new chat
@@ -42,6 +46,8 @@ async function boot() {
   renderNet(app.online);
   renderChatList();
   openChat(chats[0]?.id || null);
+  if (touch) $('#hint').textContent = 'Documents stay with this chat';
+  if (touch || matchMedia('(max-width: 700px)').matches) $('#input').placeholder = 'Ask anything…';
   setInterval(async () => renderNet(await window.api.online()), 5000);
   window.addEventListener('online', async () => renderNet(await window.api.online()));
   window.addEventListener('offline', () => renderNet(false));
@@ -68,7 +74,7 @@ function renderPicker() {
     for (const id of models) group.append(el('option', { value: `${p.id}|${id}`, textContent: NAMES[id] || id }));
     sel.append(group);
   }
-  const local = el('optgroup', { label: 'On this computer (works offline)' });
+  const local = el('optgroup', { label: onDevice() ? 'On this phone (works offline)' : 'On this computer (works offline)' });
   if (app.ollama.models.length) {
     for (const m of app.ollama.models) local.append(el('option', { value: `ollama|${m.name}`, textContent: m.name }));
   } else {
@@ -125,13 +131,18 @@ function renderChatList() {
 }
 $('#chatSearch').addEventListener('input', renderChatList);
 
+const closeDrawer = () => document.body.classList.remove('drawer-open');
+$('#menuBtn').addEventListener('click', () => document.body.classList.toggle('drawer-open'));
+$('#scrim').addEventListener('click', closeDrawer);
+
 function openChat(id) {
+  closeDrawer();
   current = chats.find((c) => c.id === id) || null;
   pending = [];
   renderChatList();
   renderMessages();
   renderChips();
-  $('#input').focus();
+  if (!touch) $('#input').focus();
 }
 
 $('#newChat').addEventListener('click', () => openChat(null));
@@ -171,7 +182,7 @@ function fillMeta(meta, m) {
   if (!m.content) return;
   const copy = el('button', { textContent: 'Copy' });
   copy.addEventListener('click', async () => {
-    await navigator.clipboard.writeText(m.content);
+    await (window.api.copy ? window.api.copy(m.content) : navigator.clipboard.writeText(m.content));
     copy.textContent = 'Copied';
     setTimeout(() => (copy.textContent = 'Copy'), 1200);
   });
@@ -254,7 +265,7 @@ input.addEventListener('input', () => {
   input.style.height = `${Math.min(input.scrollHeight, 220)}px`;
 });
 input.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !touch) {
     e.preventDefault();
     send();
   }
@@ -264,7 +275,7 @@ $('#stop').addEventListener('click', () => active && window.api.stop(active.requ
 document.querySelectorAll('.starters button').forEach((b) =>
   b.addEventListener('click', () => {
     input.value = b.dataset.prompt;
-    input.focus();
+    if (!touch) input.focus();
     if (!docsInView().length) $('#attach').click();
   }));
 
@@ -361,7 +372,10 @@ window.api.onChatEvent((ev) => {
 // ---------- Settings ----------
 
 const dlg = $('#settings');
-$('#openSettings').addEventListener('click', openSettings);
+$('#openSettings').addEventListener('click', () => {
+  closeDrawer();
+  openSettings();
+});
 
 async function openSettings() {
   app = await window.api.state();
@@ -421,9 +435,15 @@ function renderSettings() {
   }
 
   const o = app.ollama;
+  const device = onDevice();
   const st = $('#ollamaState');
   st.innerHTML = '';
-  if (o.running) {
+  if (device) {
+    st.append(
+      el('span', { className: o.models.length ? 'ok' : 'warn', textContent: o.models.length ? '● Ready offline. ' : '● No offline model yet. ' }),
+      'Offline answers come from a small AI model stored on this phone. Download one on Wi-Fi; it then works anywhere, even in airplane mode. Phone models are much smaller than Claude or GPT, so use them for drafting, short documents and quick questions.',
+    );
+  } else if (o.running) {
     st.append(el('span', { className: 'ok', textContent: '● Ollama is running. ' }), `${o.models.length} local model${o.models.length === 1 ? '' : 's'} ready for offline use.`);
   } else {
     const get = el('button', { type: 'button', textContent: 'Get Ollama ↗' });
@@ -441,7 +461,7 @@ function renderSettings() {
   for (const m of o.models) {
     const rm = el('button', { type: 'button', textContent: 'Remove' });
     rm.addEventListener('click', async () => {
-      if (!confirm(`Remove ${m.name} from this computer?`)) return;
+      if (!confirm(`Remove ${m.name} from this ${device ? 'phone' : 'computer'}?`)) return;
       await window.api.ollamaDelete(m.name);
       openSettings();
     });
@@ -451,9 +471,9 @@ function renderSettings() {
   const rec = $('#recommended');
   rec.innerHTML = '';
   if (o.running) {
-    rec.append(el('div', { className: 'muted small', textContent: 'Recommended for documents:' }));
+    rec.append(el('div', { className: 'muted small', textContent: device ? 'Models for this phone:' : 'Recommended for documents:' }));
     const have = new Set(o.models.map((m) => m.name));
-    for (const r of RECOMMENDED) {
+    for (const r of app.local?.catalog || RECOMMENDED) {
       const btn = el('button', { type: 'button', textContent: have.has(r.name) ? 'Installed' : `Download ${r.size}`, disabled: have.has(r.name) });
       btn.addEventListener('click', () => pull(r.name, btn));
       rec.append(el('div', { className: 'rec-item' }, el('div', { className: 'desc' }, el('b', { textContent: r.name }), el('div', { className: 'muted small', textContent: r.note })), btn));
@@ -461,6 +481,8 @@ function renderSettings() {
   }
   $('#customModel').disabled = !o.running;
   $('#pullCustom').disabled = !o.running;
+  $('#customModel').placeholder = device ? 'Or paste a model download link (.task file)' : 'Any Ollama model, e.g. qwen3:14b';
+  $('#importModel').classList.toggle('hidden', !device);
 
   const def = $('#localDefault');
   def.innerHTML = '';
@@ -473,6 +495,17 @@ function renderSettings() {
   $('#systemPrompt').value = app.settings.systemPrompt || '';
   $('#versionLine').textContent = `Vanguard AI ${app.version}`;
 }
+
+$('#importModel').addEventListener('click', async () => {
+  try {
+    if (await window.api.importLocalModel()) {
+      await openSettings();
+      renderPicker();
+    }
+  } catch (err) {
+    alert(`Import failed: ${err.message}`);
+  }
+});
 
 $('#pullCustom').addEventListener('click', () => {
   const name = $('#customModel').value.trim();

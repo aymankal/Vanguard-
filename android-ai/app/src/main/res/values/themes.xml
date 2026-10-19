@@ -1,0 +1,9 @@
+<resources>
+    <color name="navy">#0B1220</color>
+    <style name="Theme.VanguardAI" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/navy</item>
+        <item name="android:statusBarColor">@color/navy</item>
+        <item name="android:navigationBarColor">@color/navy</item>
+        <item name="android:colorAccent">#F26A1B</item>
+    </style>
+</resources>

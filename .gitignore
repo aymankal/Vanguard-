@@ -9,3 +9,7 @@ android/local.properties
 *.keystore
 *.jks
 desktop-ai/dist/
+android-ai/.gradle/
+android-ai/build/
+android-ai/app/build/
+android-ai/local.properties

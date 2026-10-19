@@ -11,6 +11,7 @@ your own computer, so contracts and reports still get read, summarised and draft
 | Windows | [VanguardAI-Setup.exe](https://github.com/aymankal/Vanguard-/releases/download/vanguard-ai/VanguardAI-Setup.exe) |
 | macOS   | [VanguardAI-mac.dmg](https://github.com/aymankal/Vanguard-/releases/download/vanguard-ai/VanguardAI-mac.dmg) (Apple Silicon and Intel) |
 | Linux   | [VanguardAI-linux.AppImage](https://github.com/aymankal/Vanguard-/releases/download/vanguard-ai/VanguardAI-linux.AppImage) |
+| Android | [VanguardAI.apk](https://github.com/aymankal/Vanguard-/releases/download/vanguard-ai-android/VanguardAI.apk) (see [android-ai](../android-ai/README.md)) |
 
 GitHub Actions builds these on every push that touches `desktop-ai/` (workflow: *Vanguard AI desktop*).
 The installers aren't code-signed yet: on Windows click **More info → Run anyway**; on macOS
