@@ -43,7 +43,8 @@
       "src/**",
       "renderer/**",
       "build/icon.png",
-      "package.json"
+      "package.json",
+      "!node_modules/@napi-rs/**"
     ],
     "win": {
       "target": [
