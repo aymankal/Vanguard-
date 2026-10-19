@@ -1,0 +1,91 @@
+{
+  "name": "vanguard-ai",
+  "productName": "Vanguard AI",
+  "version": "1.0.0",
+  "description": "Desktop AI workspace: Claude, GPT and Gemini online, local models offline, built for documents.",
+  "author": "Vanguard Services SAL",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.js",
+    "dist": "electron-builder --publish never",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:linux": "electron-builder --linux --publish never"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
+    "docx": "^9.12.0",
+    "dompurify": "^3.4.17",
+    "exceljs": "^4.4.0",
+    "mammoth": "^1.13.0",
+    "marked": "^18.1.1",
+    "openai": "^7.39.0",
+    "pdfjs-dist": "^6.4.299"
+  },
+  "devDependencies": {
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.vanguardservices.ai",
+    "productName": "Vanguard AI",
+    "artifactName": "VanguardAI-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**",
+      "renderer/**",
+      "build/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "VanguardAI-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "artifactName": "VanguardAI-mac.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Office",
+      "artifactName": "VanguardAI-linux.${ext}",
+      "syncDesktopName": true
+    },
+    "publish": null
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aymankal/Vanguard-.git"
+  },
+  "desktopName": "vanguard-ai.desktop"
+}

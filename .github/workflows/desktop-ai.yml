@@ -1,0 +1,80 @@
+# Builds the Vanguard AI desktop app (desktop-ai/) for Windows, macOS and Linux and publishes the
+# installers to one GitHub release. Download links that always point at the newest build:
+#   Windows: https://github.com/aymankal/Vanguard-/releases/download/vanguard-ai/VanguardAI-Setup.exe
+#   macOS:   https://github.com/aymankal/Vanguard-/releases/download/vanguard-ai/VanguardAI-mac.dmg
+#   Linux:   https://github.com/aymankal/Vanguard-/releases/download/vanguard-ai/VanguardAI-linux.AppImage
+name: Vanguard AI desktop
+on:
+  push:
+    paths: [desktop-ai/**, .github/workflows/desktop-ai.yml]
+  pull_request:
+    paths: [desktop-ai/**, .github/workflows/desktop-ai.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: desktop-ai-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist:win
+            file: desktop-ai/dist/VanguardAI-Setup.exe
+          - os: macos-latest
+            script: dist:mac
+            file: desktop-ai/dist/VanguardAI-mac.dmg
+          - os: ubuntu-latest
+            script: dist:linux
+            file: desktop-ai/dist/VanguardAI-linux.AppImage
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop-ai
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop-ai/package-lock.json
+      - run: npm ci
+      - run: npm test
+      # No code-signing certificate yet: Windows shows SmartScreen and macOS needs right-click → Open
+      # the first time. Add CSC_LINK / CSC_KEY_PASSWORD secrets later to sign.
+      - run: npm run ${{ matrix.script }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}
+          path: ${{ matrix.file }}
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: vanguard-ai
+          name: Vanguard AI desktop
+          make_latest: false
+          overwrite_files: true
+          body: |
+            Latest build: #${{ github.run_number }} from ${{ github.ref_name }} (${{ github.sha }}).
+
+            **Windows:** download VanguardAI-Setup.exe and run it. If SmartScreen appears, click More info → Run anyway.
+            **macOS:** open VanguardAI-mac.dmg and drag Vanguard AI to Applications. First launch: right-click the app → Open.
+            **Linux:** download VanguardAI-linux.AppImage, make it executable, run it.
+
+            Then open Settings: paste API keys for the cloud models you want, and install Ollama plus one local model for offline use.
+          files: out/*
