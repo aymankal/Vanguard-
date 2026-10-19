@@ -1,0 +1,82 @@
+# Builds Vanguard AI for Android (android-ai/) and publishes the APK to one fixed release, so this
+# link always has the newest build:
+#   https://github.com/aymankal/Vanguard-/releases/download/vanguard-ai-android/VanguardAI.apk
+# The interface comes from desktop-ai/renderer, so changes there rebuild the APK too.
+name: Vanguard AI Android
+on:
+  push:
+    paths: [android-ai/**, desktop-ai/renderer/**, desktop-ai/package*.json, .github/workflows/android-ai.yml]
+  pull_request:
+    paths: [android-ai/**, desktop-ai/renderer/**, desktop-ai/package*.json, .github/workflows/android-ai.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: android-ai-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop-ai/package-lock.json
+      # marked and DOMPurify for the bundled interface (no Electron download needed).
+      - run: npm ci --ignore-scripts
+        working-directory: desktop-ai
+      # 21: the MediaPipe on-device model library ships Java 21 class files.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      # Without a release key, Android's debug key signs the APK. Keep that key between runs so
+      # each build still installs over the last one.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: vanguard-ai-debug-keystore
+      # Signing key from repo secrets, so every build installs over the last one. Secrets:
+      # VANGUARD_AI_KEYSTORE_BASE64, VANGUARD_AI_KEYSTORE_PASSWORD, VANGUARD_AI_KEY_ALIAS, VANGUARD_AI_KEY_PASSWORD.
+      - name: Load signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.VANGUARD_AI_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/vanguard-ai.keystore"
+            echo "VANGUARD_AI_KEYSTORE_PATH=$RUNNER_TEMP/vanguard-ai.keystore" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No VANGUARD_AI_KEYSTORE_BASE64 secret. Signing with the cached debug key; add a release key before publishing to the Play Store."
+          fi
+      - name: Build signed APK
+        working-directory: android-ai
+        env:
+          VANGUARD_AI_KEYSTORE_PASSWORD: ${{ secrets.VANGUARD_AI_KEYSTORE_PASSWORD }}
+          VANGUARD_AI_KEY_ALIAS: ${{ secrets.VANGUARD_AI_KEY_ALIAS }}
+          VANGUARD_AI_KEY_PASSWORD: ${{ secrets.VANGUARD_AI_KEY_PASSWORD }}
+        run: gradle assembleRelease -PversionCode=${{ github.run_number }} --no-daemon
+      - name: Name the APK
+        run: cp android-ai/app/build/outputs/apk/release/app-release.apk VanguardAI.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VanguardAI-android-${{ github.run_number }}
+          path: VanguardAI.apk
+      - name: Publish release
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: vanguard-ai-android
+          name: Vanguard AI for Android
+          make_latest: false
+          overwrite_files: true
+          body: |
+            Vanguard AI for Android (build ${{ github.run_number }}, ${{ github.sha }}).
+            Install: download VanguardAI.apk on the phone, open it, and allow installs from your browser if asked.
+            Each build installs over the previous one; chats, keys and offline models are kept.
+            Then open ☰ → Settings: paste API keys, and download an offline model on Wi-Fi.
+          files: VanguardAI.apk

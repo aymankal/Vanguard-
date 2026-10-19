@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'" />
+  <title>Vanguard AI</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <aside id="sidebar">
+    <div class="brand"><img src="../build/icon.png" alt="" /> Vanguard AI</div>
+    <button id="newChat" class="primary wide">+ New chat</button>
+    <input id="chatSearch" type="search" placeholder="Search chats" />
+    <nav id="chatList"></nav>
+    <div class="sidebar-foot">
+      <button id="openSettings" class="ghost wide">⚙ Settings</button>
+    </div>
+  </aside>
+
+  <main>
+    <header>
+      <button id="menuBtn" class="icon ghost" title="Chats">☰</button>
+      <select id="modelPicker" title="Model"></select>
+      <span id="netBadge" class="badge">…</span>
+      <span id="routeNote" class="muted small"></span>
+    </header>
+
+    <section id="messages">
+      <div id="empty" class="empty">
+        <h1>What are we working on?</h1>
+        <p>Drop in contracts, proposals, reports or spreadsheets and ask anything. Online you get Claude, GPT, Gemini and more. Offline, a model on your own device takes over.</p>
+        <div class="starters">
+          <button data-prompt="Summarize the attached document: key terms, obligations, dates, money, and risks. Finish with what I should push back on.">Summarize &amp; flag risks</button>
+          <button data-prompt="Extract every deadline, renewal date, notice period and payment term from the attached documents into a table.">Extract dates &amp; terms</button>
+          <button data-prompt="Rewrite the attached document to be clearer and more persuasive for an international B2B client. Keep the structure.">Rewrite for a client</button>
+          <button data-prompt="Compare the attached documents and list the material differences in a table.">Compare documents</button>
+        </div>
+      </div>
+    </section>
+
+    <footer id="composer">
+      <div id="docChips"></div>
+      <div class="composer-row">
+        <button id="attach" class="icon" title="Attach documents (PDF, Word, Excel, text)">📎</button>
+        <textarea id="input" rows="1" placeholder="Ask anything, or drop documents here…"></textarea>
+        <button id="send" class="primary">Send</button>
+        <button id="stop" class="danger hidden">Stop</button>
+      </div>
+      <div class="muted small hint" id="hint">Enter to send · Shift+Enter for a new line · Documents stay with this chat</div>
+    </footer>
+  </main>
+
+  <div id="scrim"></div>
+  <div id="dropOverlay" class="hidden"><div>Drop documents to attach</div></div>
+
+  <dialog id="settings">
+    <form method="dialog" class="settings-body">
+      <div class="settings-head">
+        <h2>Settings</h2>
+        <button class="ghost" value="close">✕</button>
+      </div>
+
+      <h3>Online models</h3>
+      <p class="muted small">Paste an API key for each provider you want. Keys are encrypted with your device's keychain and only sent to that provider. "Refresh" pulls the provider's current model list, so new flagships appear as soon as they launch.</p>
+      <div id="keyRows"></div>
+
+      <h3>Offline models</h3>
+      <div id="ollamaState" class="card"></div>
+      <div id="localList"></div>
+      <div class="row">
+        <input id="customModel" placeholder="Any Ollama model, e.g. qwen3:14b" />
+        <button id="pullCustom" type="button">Download</button>
+        <button id="importModel" type="button" class="hidden">Import file</button>
+      </div>
+      <div id="recommended"></div>
+
+      <h3>Behaviour</h3>
+      <label class="check"><input type="checkbox" id="autoOffline" /> Use a local model automatically when offline</label>
+      <label class="check"><input type="checkbox" id="webSearch" /> Let Claude search the web when online</label>
+      <label class="field">Local model to use offline
+        <select id="localDefault"></select>
+      </label>
+      <label class="field">Custom instructions for every chat
+        <textarea id="systemPrompt" rows="3" placeholder="e.g. Write in British English. Our clients are in the US and EU."></textarea>
+      </label>
+      <p class="muted small" id="versionLine"></p>
+    </form>
+  </dialog>
+
+  <script src="../node_modules/marked/lib/marked.umd.js"></script>
+  <script src="../node_modules/dompurify/dist/purify.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

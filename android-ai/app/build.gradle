@@ -1,0 +1,91 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "co.vanguardservices.ai"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "co.vanguardservices.ai"
+        // 26+: the Claude and OpenAI SDKs use java.time.
+        minSdk 26
+        targetSdk 34
+        // CI passes the run number so every build installs over the last one.
+        def buildNumber = (project.findProperty("versionCode") ?: "1").toString().toInteger()
+        versionCode buildNumber
+        versionName "1.0.${buildNumber}"
+        // The on-device model engine ships for 64-bit ARM phones (nearly every phone since 2017).
+        ndk { abiFilters "arm64-v8a" }
+    }
+
+    signingConfigs {
+        // The release key comes from CI secrets (see .github/workflows/android-ai.yml). It never lives
+        // in the repo. Without it, the build falls back to Android's debug key.
+        release {
+            def ks = System.getenv("VANGUARD_AI_KEYSTORE_PATH")
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv("VANGUARD_AI_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("VANGUARD_AI_KEY_ALIAS")
+                keyPassword System.getenv("VANGUARD_AI_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig System.getenv("VANGUARD_AI_KEYSTORE_PATH") ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        coreLibraryDesugaringEnabled true
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packagingOptions {
+        resources {
+            excludes += ["META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*", "META-INF/*.kotlin_module",
+                         "META-INF/versions/**", "META-INF/INDEX.LIST", "META-INF/io.netty.versions.properties"]
+        }
+    }
+
+    // Model files are stored compressed-free so the engine can map them straight from disk.
+    androidResources { noCompress += ["task", "bin"] }
+}
+
+// The interface is the desktop app's (desktop-ai/renderer), copied in at build time so both apps
+// stay identical. desktop-ai needs `npm ci --ignore-scripts` first for marked and DOMPurify.
+def desktop = file("../../desktop-ai")
+def webOut = layout.buildDirectory.dir("generated/web")
+tasks.register("copyWeb", Copy) {
+    def marked = new File(desktop, "node_modules/marked/lib/marked.umd.js")
+    doFirst {
+        if (!marked.exists()) throw new GradleException("Run `npm ci --ignore-scripts` in desktop-ai first (needs marked and DOMPurify).")
+    }
+    into webOut.map { it.dir("web") }
+    from(new File(desktop, "renderer")) {
+        into "renderer"
+        // Loads the Android bridge before the app script.
+        filter { line -> line.replace('<script src="app.js"></script>', '<script src="../android-api.js"></script>\n  <script src="app.js"></script>') }
+    }
+    from(new File(desktop, "build/icon.png")) { into "build" }
+    from(new File(desktop, "node_modules/marked/lib/marked.umd.js")) { into "node_modules/marked/lib" }
+    from(new File(desktop, "node_modules/dompurify/dist/purify.min.js")) { into "node_modules/dompurify/dist" }
+}
+android.sourceSets.main.assets.srcDirs += [layout.buildDirectory.dir("generated").get().asFile]
+preBuild.dependsOn "copyWeb"
+
+dependencies {
+    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.2"
+    // Lines kotlin-stdlib-jdk7/jdk8 up with kotlin-stdlib (avoids duplicate classes).
+    implementation platform("org.jetbrains.kotlin:kotlin-bom:1.9.25")
+    implementation "com.anthropic:anthropic-java:2.73.0"
+    implementation "com.openai:openai-java:4.86.0"
+    implementation "com.google.mediapipe:tasks-genai:0.10.24"
+    implementation "com.google.guava:guava:33.3.1-android"
+    implementation "com.tom-roush:pdfbox-android:2.0.27.0"
+}
