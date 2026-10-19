@@ -60,7 +60,7 @@ android {
 // The interface is the desktop app's (desktop-ai/renderer), copied in at build time so both apps
 // stay identical. desktop-ai needs `npm ci --ignore-scripts` first for marked and DOMPurify.
 def desktop = file("../../desktop-ai")
-def webOut = layout.buildDirectory.dir("generated/web")
+def webOut = layout.buildDirectory.dir("webassets")
 tasks.register("copyWeb", Copy) {
     def marked = new File(desktop, "node_modules/marked/lib/marked.umd.js")
     doFirst {
@@ -76,7 +76,8 @@ tasks.register("copyWeb", Copy) {
     from(new File(desktop, "node_modules/marked/lib/marked.umd.js")) { into "node_modules/marked/lib" }
     from(new File(desktop, "node_modules/dompurify/dist/purify.min.js")) { into "node_modules/dompurify/dist" }
 }
-android.sourceSets.main.assets.srcDirs += [layout.buildDirectory.dir("generated").get().asFile]
+// Its own folder: sharing build/generated with other tasks fails Gradle's task validation.
+android.sourceSets.main.assets.srcDirs += [layout.buildDirectory.dir("webassets").get().asFile]
 preBuild.dependsOn "copyWeb"
 
 dependencies {
