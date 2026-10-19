@@ -27,10 +27,11 @@ jobs:
       # marked and DOMPurify for the bundled interface (no Electron download needed).
       - run: npm ci --ignore-scripts
         working-directory: desktop-ai
+      # 21: the MediaPipe on-device model library ships Java 21 class files.
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
