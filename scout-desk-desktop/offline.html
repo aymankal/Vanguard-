@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+  <title>Scout Desk</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body { display: grid; place-items: center; background: #0B1220; color: #E6EAF2; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .card { text-align: center; max-width: 340px; padding: 24px; }
+    img { width: 84px; height: 84px; }
+    h1 { font-size: 22px; margin: 16px 0 6px; }
+    p { color: #9AA6BD; margin: 0 0 20px; }
+    a { display: inline-block; background: #2563EB; color: #fff; text-decoration: none; padding: 10px 22px; border-radius: 10px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="build/icon.png" alt="">
+    <h1>You're offline</h1>
+    <p>Scout Desk needs the internet to open the first time. It reconnects on its own when you're back online.</p>
+    <a href="https://aymankal.github.io/Vanguard-/scout-desk/">Try again</a>
+  </div>
+  <script>
+    window.addEventListener('online', () => { location.href = 'https://aymankal.github.io/Vanguard-/scout-desk/'; });
+  </script>
+</body>
+</html>

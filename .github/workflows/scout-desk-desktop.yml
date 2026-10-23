@@ -1,0 +1,80 @@
+# Builds the Scout Desk desktop app (scout-desk-desktop/) for Windows, macOS and Linux and publishes the
+# installers to one GitHub release. Download links that always point at the newest build:
+#   Windows: https://github.com/aymankal/Vanguard-/releases/download/scout-desk-desktop/ScoutDesk-Setup.exe
+#   macOS:   https://github.com/aymankal/Vanguard-/releases/download/scout-desk-desktop/ScoutDesk-mac.dmg
+#   Linux:   https://github.com/aymankal/Vanguard-/releases/download/scout-desk-desktop/ScoutDesk-linux.AppImage
+name: Scout Desk desktop
+on:
+  push:
+    paths: [scout-desk-desktop/**, .github/workflows/scout-desk-desktop.yml]
+  pull_request:
+    paths: [scout-desk-desktop/**, .github/workflows/scout-desk-desktop.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: scout-desk-desktop-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist:win
+            file: scout-desk-desktop/dist/ScoutDesk-Setup.exe
+          - os: macos-latest
+            script: dist:mac
+            file: scout-desk-desktop/dist/ScoutDesk-mac.dmg
+          - os: ubuntu-latest
+            script: dist:linux
+            file: scout-desk-desktop/dist/ScoutDesk-linux.AppImage
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: scout-desk-desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: scout-desk-desktop/package-lock.json
+      - run: npm ci
+      - run: npm test
+      # No code-signing certificate yet: Windows shows SmartScreen and macOS needs right-click → Open
+      # the first time. Add CSC_LINK / CSC_KEY_PASSWORD secrets later to sign.
+      - run: npm run ${{ matrix.script }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}
+          path: ${{ matrix.file }}
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: scout-desk-desktop
+          name: Scout Desk desktop
+          make_latest: false
+          overwrite_files: true
+          body: |
+            Latest build: #${{ github.run_number }} from ${{ github.ref_name }} (${{ github.sha }}).
+
+            **Windows:** download ScoutDesk-Setup.exe and run it. If SmartScreen appears, click More info → Run anyway.
+            **macOS:** open ScoutDesk-mac.dmg and drag Scout Desk to Applications. First launch: right-click the app → Open.
+            **Linux:** download ScoutDesk-linux.AppImage, make it executable, run it.
+
+            Sign in with your Scout Desk account. The app loads the live desk, so every Scout Desk update shows up on the next open without reinstalling.
+          files: out/*

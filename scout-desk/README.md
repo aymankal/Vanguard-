@@ -19,7 +19,9 @@ The first person to join becomes a partner, so sign up yourself before sharing t
 4. Share the link. Approve people from **Queue → Team**.
 
 ## Install
-- **Android / desktop Chrome:** open the site and use **Install app** in the address bar or menu.
+- **Windows, Mac, Linux:** download the desktop app (blue V icon) from [scout-desk-desktop](../scout-desk-desktop/README.md), or tap **Install** in the desk.
+- **Android:** download [ScoutDesk.apk](https://github.com/aymankal/Vanguard-/releases/latest/download/ScoutDesk.apk) (see [android](../android/README.md)).
+- **Desktop Chrome / Edge:** open the site and use **Install app** in the address bar or menu.
 - **iPhone:** open in Safari, then Share → Add to Home Screen.
 
 Chrome only offers install over HTTPS.

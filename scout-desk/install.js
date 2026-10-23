@@ -7,8 +7,16 @@
   const isSafari = /^((?!chrome|android|crios|fxios|edgios).)*safari/i.test(ua);
   const isAndroid = /android/i.test(ua);
   const inAndroidApp = /ScoutDeskAndroid\//.test(ua);
+  const inDesktopApp = /ScoutDeskDesktop\//.test(ua);
   const APK_URL = "https://github.com/aymankal/Vanguard-/releases/latest/download/ScoutDesk.apk";
-  const installed = () => inAndroidApp || window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  // Desktop installers (scout-desk-desktop/), rebuilt by CI into one release that always holds the newest build.
+  const DESKTOP = "https://github.com/aymankal/Vanguard-/releases/download/scout-desk-desktop/";
+  const desktopApp = isIOS || isAndroid ? null
+    : /win/i.test(navigator.platform) ? { label: "Windows", file: "ScoutDesk-Setup.exe" }
+    : /mac/i.test(navigator.platform) ? { label: "Mac", file: "ScoutDesk-mac.dmg" }
+    : /linux/i.test(navigator.platform) ? { label: "Linux", file: "ScoutDesk-linux.AppImage" }
+    : null;
+  const installed = () => inAndroidApp || inDesktopApp || window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
   let deferred = null;
 
   const buttons = () => document.querySelectorAll("[data-install]");
@@ -36,6 +44,13 @@
       "Open <b>ScoutDesk.apk</b> from the download notification.",
       "If Android asks, allow installs from your browser, then tap <b>Install</b>. Scout Desk appears with the V icon.",
     ];
+    if (desktopApp) return [
+      `Click <b>Download for ${desktopApp.label}</b> below.`,
+      desktopApp.label === "Windows" ? "Run <b>ScoutDesk-Setup.exe</b>. If SmartScreen appears, click <b>More info → Run anyway</b>."
+        : desktopApp.label === "Mac" ? "Open <b>ScoutDesk-mac.dmg</b> and drag Scout Desk to Applications. The first time, right-click it and choose <b>Open</b>."
+        : "Make <b>ScoutDesk-linux.AppImage</b> executable, then run it.",
+      "Scout Desk opens in its own window with the blue V icon, stays signed in, and picks up every update by itself.",
+    ];
     if (isSafari) return [
       "In Safari's menu bar, choose <b>File → Add to Dock</b>.",
       "Click <b>Add</b>. Scout Desk opens in its own window.",
@@ -51,12 +66,18 @@
     ol.textContent = "";
     steps().forEach((s) => ol.append(STEP(s)));
     document.getElementById("install-apk").hidden = !isAndroid;
+    const dl = document.getElementById("install-desktop");
+    dl.hidden = !desktopApp;
+    if (desktopApp) {
+      dl.href = DESKTOP + desktopApp.file;
+      dl.textContent = `Download for ${desktopApp.label}`;
+    }
     document.getElementById("install-sheet").hidden = false;
   }
   function closeSheet() { document.getElementById("install-sheet").hidden = true; }
 
   async function install() {
-    if (isAndroid) { openSheet(); return; }
+    if (isAndroid || desktopApp) { openSheet(); return; }
     if (deferred) {
       const d = deferred; deferred = null;
       d.prompt();
