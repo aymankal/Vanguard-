@@ -74,6 +74,8 @@
     <button class="tab" role="tab" id="t-submit" data-tab="submit" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg>Submit</button>
     <button class="tab" role="tab" id="t-vetting" data-tab="vetting" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6"/><path d="M16 11l2 2 4-4"/></svg>Vetting</button>
     <button class="tab" role="tab" id="t-investors" data-tab="investors" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 10l9-6 9 6"/><path d="M5 10v9M10 10v9M14 10v9M19 10v9M3 21h18"/></svg>Investors</button>
+    <button class="tab" role="tab" id="t-match" data-tab="match" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="12" r="5"/><circle cx="16" cy="12" r="5"/></svg>Match</button>
+    <button class="tab" role="tab" id="t-copilot" data-tab="copilot" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg>Copilot</button>
     <button class="tab" role="tab" id="t-queue" data-tab="queue" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 2h6l1-2h5"/></svg><span id="queue-label">Queue</span><span class="count" id="queue-count"></span></button>
     <button class="tab" role="tab" id="t-about" data-tab="about" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l8 13 8-13"/><path d="M2 6h5M17 6h5"/></svg>About</button>
   </nav>
@@ -136,6 +138,82 @@
       <div class="filters" id="inv-filters"></div>
       <div class="filters" id="inv-who-filters"></div>
       <div class="list" id="inv-list"></div>
+    </section>
+
+    <!-- MATCH -->
+    <section class="view" id="view-match" hidden>
+      <div class="view-head">
+        <div><h2>Match making</h2><p class="sub">Pick a startup to see the 5 best-fit funds, or pick a fund to see the 5 best-fit startups. Scored out of 100 from the data already on the desk.</p></div>
+        <div class="seg" role="tablist" aria-label="Match direction">
+          <button type="button" data-mm="deal" aria-selected="true">Startup → Funds</button>
+          <button type="button" data-mm="inv" aria-selected="false">Fund → Startups</button>
+        </div>
+      </div>
+      <div class="field" id="match-pick"></div>
+      <details class="how">
+        <summary>How the match score works (0–100)</summary>
+        <div class="how-grid">
+          <div><b>Sector · 30</b>Fund lists the startup's sector = 30. Generalist = 18.</div>
+          <div><b>Stage · 25</b>Fund invests at the startup's stage = 25. One stage away = 10.</div>
+          <div><b>Check size · 20</b>Fund's check covers 5% to 50% of the round = 20. Within 2x of that = 8. No data = 10.</div>
+          <div><b>Geography · 10</b>Same market = 10. Either side Global = 7. Fund geography blank = 5.</div>
+          <div><b>Access · 15</b>Relationship: existing 8, warm intro 6, cold 2. Co-invest fit: high 7, medium 4, low 1.</div>
+        </div>
+      </details>
+      <div class="list" id="match-list"></div>
+    </section>
+
+    <!-- COPILOT -->
+    <section class="view" id="view-copilot" hidden>
+      <div class="view-head">
+        <div><h2>Copilot</h2><p class="sub">Ask about any startup or fund on the desk, or draft a new entry for review.</p></div>
+        <div class="seg" role="tablist" aria-label="Copilot mode">
+          <button type="button" data-cp="ask" aria-selected="true">Ask</button>
+          <button type="button" data-cp="add" aria-selected="false">Draft an entry</button>
+        </div>
+      </div>
+      <div class="cp-status" id="cp-status"></div>
+
+      <div class="cp-pane" id="cp-ask">
+        <div class="cp-thread" id="cp-thread" aria-live="polite"></div>
+        <div class="cp-prompts" id="cp-prompts"></div>
+        <div class="cp-compose">
+          <label for="cp-input" class="help">Your question</label>
+          <textarea id="cp-input" rows="2" placeholder="Which funds fit our best startup in Diligence?"></textarea>
+          <div class="cp-row">
+            <span class="cp-note">Answers use only the records on this desk.</span>
+            <span class="cp-spacer"></span>
+            <button class="btn small" type="button" id="cp-clear">Clear</button>
+            <button class="btn small" type="button" id="cp-stop" hidden>Stop</button>
+            <button class="btn primary" type="button" id="cp-send">Ask</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="cp-pane" id="cp-add" hidden>
+        <form class="f" id="cp-add-form" novalidate onsubmit="return false">
+          <fieldset>
+            <legend>What to add</legend>
+            <p class="fs-hint">Give a name and what you know. Copilot drafts the entry and loads it into the Submit form. A partner still approves it.</p>
+            <div class="grid">
+              <div class="field full"><span class="lbl">Type</span>
+                <div class="seg" role="tablist" aria-label="Entry type">
+                  <button type="button" data-cpk="startup" aria-selected="true">Startup</button>
+                  <button type="button" data-cpk="investor" aria-selected="false">Investor</button>
+                </div>
+              </div>
+              <div class="field"><label for="cp-a-name">Name<span class="req" aria-hidden="true">*</span></label><input type="text" id="cp-a-name" placeholder="Startup name" autocomplete="off"></div>
+              <div class="field"><label for="cp-a-site">Website</label><input type="text" id="cp-a-site" placeholder="company.com" autocomplete="off"></div>
+              <div class="field full"><label for="cp-a-known">What you already know</label><textarea id="cp-a-known" rows="4" placeholder="Paste the pitch, deck notes, founder name, traction you were told, who referred them."></textarea><span class="help">Copilot fills fields only from what you write here. Revenue, raise size and valuation are never guessed.</span></div>
+            </div>
+          </fieldset>
+          <div class="form-foot">
+            <button class="btn primary" type="button" id="cp-a-go">Draft the entry</button>
+            <button class="btn" type="button" id="cp-a-stop" hidden>Stop</button>
+          </div>
+        </form>
+        <div id="cp-a-out"></div>
+      </div>
     </section>
 
     <!-- QUEUE -->
