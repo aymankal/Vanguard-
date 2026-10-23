@@ -1,0 +1,64 @@
+{
+  "name": "scout-desk-desktop",
+  "productName": "Scout Desk",
+  "version": "1.0.0",
+  "description": "Vanguard Frontier Scout Desk for Windows, macOS and Linux.",
+  "author": "Vanguard Services SAL",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.js",
+    "dist": "electron-builder --publish never",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:linux": "electron-builder --linux --publish never"
+  },
+  "devDependencies": {
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.vanguardservices.scoutdesk",
+    "productName": "Scout Desk",
+    "artifactName": "ScoutDesk-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "offline.html",
+      "build/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "artifactName": "ScoutDesk-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "shortcutName": "Scout Desk"
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["universal"] }],
+      "category": "public.app-category.business",
+      "artifactName": "ScoutDesk-mac.${ext}"
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "category": "Office",
+      "artifactName": "ScoutDesk-linux.${ext}",
+      "syncDesktopName": true
+    },
+    "publish": null
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aymankal/Vanguard-.git"
+  },
+  "desktopName": "scout-desk.desktop"
+}
