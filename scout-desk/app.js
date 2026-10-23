@@ -704,7 +704,7 @@ function mdInto(el,text){
     else el.append(h("p",null,inline(lines.join(" "))));
   }
 }
-const CP_ERR={not_configured:"Copilot has no AI model set up yet. A Supabase admin adds one (see scout-desk/README.md).",not_member:"Only desk members can use Copilot.",rate_limited:"The AI model is busy or out of credit. Wait a minute and try again.",too_large:"That pulled in too much data. Name one startup or fund.",bad_json:"The draft did not come back in a usable form. Try again.",upstream:"The AI model did not answer. Try again.",offline:"You're offline. Copilot needs a connection."};
+const CP_ERR={not_configured:"Copilot has no AI model set up yet. A Supabase admin adds one (see scout-desk/README.md).",not_member:"Only desk members can use Copilot.",rate_limited:"The AI model is busy or out of credit. Wait a minute and try again.",too_large:"That pulled in too much data. Name one startup or fund.",bad_json:"The draft did not come back in a usable form. Try again.",upstream:"The AI model did not answer. Try again.",offline:"You're offline. Copilot needs a connection.",refused:"The AI model declined that question. Rephrase it and try again."};
 async function cpCall(body,signal){
   const D=window.ScoutData;
   if(!navigator.onLine) throw {code:"offline"};
