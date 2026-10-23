@@ -10,9 +10,14 @@ Data lives in **Supabase**, in the same project as Vanguard Docs but in its own 
 
 ```bash
 supabase functions deploy scout-copilot
-# only if no model is set yet:
+# Claude (recommended): one secret, an API key from console.anthropic.com → API keys
+supabase secrets set ANTHROPIC_API_KEY=<key>
+# optional: ANTHROPIC_MODEL (default claude-opus-5-5)
+# or GitHub Models instead:
 supabase secrets set AI_BASE_URL=https://models.github.ai/inference AI_API_KEY=<github token> AI_MODEL=openai/gpt-4.1
 ```
+
+In the Supabase dashboard the same secrets live under Edge Functions → Secrets. When several are set, Claude wins.
 
 Without a model the Copilot tab says "AI model not set up" and everything else keeps working.
 

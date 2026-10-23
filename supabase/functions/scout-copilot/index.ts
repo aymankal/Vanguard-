@@ -3,10 +3,13 @@
 // what they can read), so this function never reads the database beyond checking the caller's role.
 // Nothing is written: a draft goes back to the app, a scout reviews it, and a partner approves it.
 //
-// It uses the same model secrets as the Vanguard Docs copilot (supabase secrets set ...):
+// Model, first one configured wins (supabase secrets set ...):
+//   ANTHROPIC_API_KEY (+ optional ANTHROPIC_MODEL, default claude-opus-5-5)   Claude, recommended
 //   AI_BASE_URL, AI_API_KEY, AI_MODEL   any OpenAI-compatible API (GitHub Models, OpenAI, OpenRouter)
-//   or AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT (+ AZURE_OPENAI_API_VERSION)
+//   AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT (+ AZURE_OPENAI_API_VERSION)
+// The last two are shared with the Vanguard Docs copilot.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import Anthropic from "npm:@anthropic-ai/sdk@^0.135.0";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -36,16 +39,18 @@ const ASK_RULES = [
   "- Be direct and short. Lead with the answer. Use a short list when comparing. No filler, no hype, no em dashes.",
 ].join("\n");
 
-type Llm = { url: string; headers: Record<string, string>; model?: string; tokenParam: string };
+type Llm = { kind: "anthropic"; client: Anthropic; model: string } | { kind: "openai"; url: string; headers: Record<string, string>; model?: string; tokenParam: string };
 function provider(): Llm | null {
+  const ak0 = Deno.env.get("ANTHROPIC_API_KEY");
+  if (ak0) return { kind: "anthropic", client: new Anthropic({ apiKey: ak0 }), model: Deno.env.get("ANTHROPIC_MODEL") || "claude-opus-5-5" };
   const base = Deno.env.get("AI_BASE_URL"), key = Deno.env.get("AI_API_KEY"), model = Deno.env.get("AI_MODEL");
   if (base && key && model) {
-    return { url: `${base.replace(/\/+$/, "")}/chat/completions`, headers: { Authorization: `Bearer ${key}` }, model, tokenParam: "max_tokens" };
+    return { kind: "openai", url: `${base.replace(/\/+$/, "")}/chat/completions`, headers: { Authorization: `Bearer ${key}` }, model, tokenParam: "max_tokens" };
   }
   const ep = Deno.env.get("AZURE_OPENAI_ENDPOINT"), ak = Deno.env.get("AZURE_OPENAI_API_KEY"), dep = Deno.env.get("AZURE_OPENAI_DEPLOYMENT");
   if (ep && ak && dep) {
     const v = Deno.env.get("AZURE_OPENAI_API_VERSION") || "2024-10-21";
-    return { url: `${ep.replace(/\/+$/, "")}/openai/deployments/${encodeURIComponent(dep)}/chat/completions?api-version=${encodeURIComponent(v)}`, headers: { "api-key": ak }, tokenParam: "max_completion_tokens" };
+    return { kind: "openai", url: `${ep.replace(/\/+$/, "")}/openai/deployments/${encodeURIComponent(dep)}/chat/completions?api-version=${encodeURIComponent(v)}`, headers: { "api-key": ak }, tokenParam: "max_completion_tokens" };
   }
   return null;
 }
@@ -53,6 +58,7 @@ function provider(): Llm | null {
 class Fail extends Error { constructor(public code: string) { super(code); } }
 
 async function complete(llm: Llm, messages: Msg[], asJson: boolean): Promise<{ text: string; truncated: boolean }> {
+  if (llm.kind === "anthropic") return completeClaude(llm.client, llm.model, messages, asJson);
   const r = await fetch(llm.url, {
     method: "POST",
     headers: { ...llm.headers, "Content-Type": "application/json" },
@@ -74,6 +80,38 @@ async function complete(llm: Llm, messages: Msg[], asJson: boolean): Promise<{ t
   const text = String(c?.message?.content ?? "").trim();
   if (!text) throw new Fail("upstream");
   return { text, truncated: c?.finish_reason === "length" };
+}
+
+// Claude: system prompt goes in `system`; refusals fall back server-side to Anthropic's recommended model.
+async function completeClaude(client: Anthropic, model: string, messages: Msg[], asJson: boolean): Promise<{ text: string; truncated: boolean }> {
+  const system = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n") || undefined;
+  const turns = messages.filter((m) => m.role !== "system").map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+  // deno-lint-ignore no-explicit-any
+  let res: any;
+  try {
+    res = await client.beta.messages.create({
+      model,
+      max_tokens: 16000,
+      ...(system ? { system } : {}),
+      messages: turns,
+      // Chat answers are short lookups; drafting needs a little more care.
+      output_config: { effort: asJson ? "medium" : "low" },
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+    // deno-lint-ignore no-explicit-any
+    } as any);
+  } catch (e) {
+    if (e instanceof Anthropic.RateLimitError) throw new Fail("rate_limited");
+    if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) { console.error("claude auth", e.message); throw new Fail("not_configured"); }
+    if (e instanceof Anthropic.BadRequestError) { console.error("claude 400", e.message); throw new Fail(/too long|too large|context/i.test(e.message) ? "too_large" : "upstream"); }
+    if (e instanceof Anthropic.APIError) { console.error("claude", e.status, e.message); throw new Fail("upstream"); }
+    throw e;
+  }
+  if (res.stop_reason === "refusal") throw new Fail("refused");
+  // deno-lint-ignore no-explicit-any
+  const text = res.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("").trim();
+  if (!text) throw new Fail("upstream");
+  return { text, truncated: res.stop_reason === "max_tokens" };
 }
 
 function history(h: unknown): Msg[] {
