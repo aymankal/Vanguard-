@@ -40,11 +40,11 @@ const ASK_RULES = [
 ].join("\n");
 
 type Llm = { kind: "anthropic"; client: Anthropic; model: string } | { kind: "openai"; url: string; headers: Record<string, string>; model?: string; tokenParam: string };
-function provider(): Llm | null {
+async function provider(): Promise<Llm | null> {
   const ak0 = Deno.env.get("ANTHROPIC_API_KEY");
   if (ak0) return { kind: "anthropic", client: new Anthropic({ apiKey: ak0 }), model: Deno.env.get("ANTHROPIC_MODEL") || "claude-opus-5-5" };
   // With only AI_API_KEY set, assume a GitHub token and use GitHub Models.
-  const key = Deno.env.get("AI_API_KEY");
+  const key = Deno.env.get("AI_API_KEY") || await vaultKey();
   const base = Deno.env.get("AI_BASE_URL") || (key ? "https://models.github.ai/inference" : "");
   const model = Deno.env.get("AI_MODEL") || (key ? "openai/gpt-4.1" : "");
   if (base && key && model) {
@@ -56,6 +56,16 @@ function provider(): Llm | null {
     return { kind: "openai", url: `${ep.replace(/\/+$/, "")}/openai/deployments/${encodeURIComponent(dep)}/chat/completions?api-version=${encodeURIComponent(v)}`, headers: { "api-key": ak }, tokenParam: "max_completion_tokens" };
   }
   return null;
+}
+
+// Fallback when the key is kept in Supabase Vault (secret "scout_ai_api_key") instead of a function secret.
+async function vaultKey(): Promise<string> {
+  const sr = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!sr) return "";
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, sr, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data, error } = await admin.rpc("scout_ai_key");
+  if (error) console.error("vault key", error.message);
+  return typeof data === "string" ? data : "";
 }
 
 class Fail extends Error { constructor(public code: string) { super(code); } }
@@ -160,7 +170,7 @@ Deno.serve(async (req) => {
   const role = me?.role as string | undefined;
   if (!role || !["partner", "scout", "viewer"].includes(role)) return json({ error: "not_member" }, 403);
 
-  const llm = provider();
+  const llm = await provider();
   if (!llm) return json({ error: "not_configured" }, 503);
 
   let body: Args;
