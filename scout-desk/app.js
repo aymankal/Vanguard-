@@ -137,7 +137,7 @@ const FORMS={
 
 /* ---------- state ---------- */
 const S={db:null,user:null,me:null,role:"offline",deals:[],investors:[],vettings:[],activity:[],reviews:{},notes:{},
-  sector:"All",includePending:false,invStage:"All",invQuery:"",vetFilter:"All",dealQuery:"",vetQuery:"",sheet:null,who:"All",invWho:"All"};
+  sector:"All",includePending:false,invStage:"All",invQuery:"",vetFilter:"All",dealQuery:"",vetQuery:"",sheet:null,who:"All",invWho:"All",mm:"deal",mmId:{deal:"",inv:""}};
 
 /* ---------- helpers ---------- */
 const $=id=>document.getElementById(id);
@@ -628,6 +628,283 @@ window.addEventListener("scroll",updateCounter,{passive:true});
 window.addEventListener("resize",updateCounter);
 for(const k in COUNTED) new MutationObserver(updateCounter).observe($(COUNTED[k].list),{childList:true});
 
+/* ---------- match making ---------- */
+function visibleInvestors(){ return S.investors.filter(i=>review("inv-"+i.id).status==="Approved"||isPartner()&&review("inv-"+i.id).status!=="Rejected"); }
+function matchScore(d,i){
+  const secs=i.sectors||[], sts=i.stages||[];
+  const sec=secs.includes(d.sector)?30:secs.includes("Generalist")?18:0;
+  const di=STAGES.indexOf(d.stage);
+  const stg=sts.includes(d.stage)?25:sts.some(x=>Math.abs(STAGES.indexOf(x)-di)===1)?10:0;
+  const R=Number(d.raise)||0, lo=Number(i.checkMin)||0, hi=Number(i.checkMax)||0;
+  let chk=10, chkNote="Raise or check size missing";
+  if(R&&hi){ const a=R*0.05, b=R*0.5; chk=(hi>=a&&lo<=b)?20:(hi>=a/2&&lo<=b*2)?8:0; chkNote=money(lo)+"–"+money(hi)+" checks on a "+money(R)+" round"; }
+  const ig=i.geography, dg=d.geography;
+  const geo=ig&&dg&&ig===dg?10:(ig==="Global"||dg==="Global")?7:!ig?5:0;
+  const rel=({"Existing relationship":8,"Warm intro available":6,"Cold":2})[i.relationship]||0;
+  const cf=({"High":7,"Medium":4,"Low":1})[i.coinvestFit]||0;
+  const parts=[["Sector",sec,30],["Stage",stg,25],["Check",chk,20],["Geography",geo,10],["Access",rel+cf,15]];
+  return {total:parts.reduce((a,p)=>a+p[1],0),parts,chkNote};
+}
+function renderMatch(){
+  const wrap=$("match-pick"), list=$("match-list");
+  document.querySelectorAll("[data-mm]").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.mm===S.mm)));
+  const byDeal=S.mm==="deal";
+  const deals=visibleDeals().filter(d=>dealStage(d)!=="Passed").sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+  const invs=visibleInvestors().sort((a,b)=>(a.fundName||"").localeCompare(b.fundName||""));
+  const pool=byDeal?deals:invs;
+  if(S.mmId[S.mm]&&!pool.some(x=>x.id===S.mmId[S.mm])) S.mmId[S.mm]="";
+  const sel=h("select",{id:"match-select"},h("option",{value:""},pool.length?(byDeal?"Choose a startup…":"Choose a fund…"):(byDeal?"No approved startups yet":"No approved funds yet")),pool.map(x=>h("option",{value:x.id},byDeal?x.name:x.fundName+(x.firm&&x.firm!==x.fundName?" · "+x.firm:""))));
+  sel.value=S.mmId[S.mm]||"";
+  sel.addEventListener("change",()=>{ S.mmId[S.mm]=sel.value; renderMatch(); });
+  wrap.textContent=""; wrap.append(h("label",{for:"match-select"},byDeal?"Startup":"Fund"),sel);
+  list.textContent="";
+  const id=S.mmId[S.mm]; if(!id){ list.append(h("div",{class:"empty"},byDeal?"Pick a startup to see its best-fit funds.":"Pick a fund to see its best-fit startups.")); return; }
+  const base=pool.find(x=>x.id===id);
+  const cands=byDeal?invs:deals;
+  if(!cands.length){ list.append(h("div",{class:"empty"},byDeal?"No approved funds in the database yet. Add some from Submit → Investor.":"No approved startups in the pipeline yet.")); return; }
+  const ranked=cands.map(c=>({c,m:byDeal?matchScore(base,c):matchScore(c,base)})).sort((a,b)=>b.m.total-a.m.total||((byDeal?a.c.fundName:a.c.name)||"").localeCompare((byDeal?b.c.fundName:b.c.name)||"")).slice(0,5);
+  list.append(h("div",{class:"result-note"},"Top "+ranked.length+" of "+cands.length+" "+(byDeal?"funds":"startups")+" for ",h("b",null,byDeal?base.name:base.fundName)));
+  ranked.forEach(({c,m},n)=>{
+    const chips=m.parts.map(([k,v,mx])=>h("span",{class:"mch"+(v===mx?" full":v===0?" zero":"")},k,h("b",null,v+"/"+mx)));
+    let top, info;
+    if(byDeal){
+      top=h("div",{class:"mtop"},h("div",null,h("div",{class:"t"},h("span",{class:"idx"},String(n+1)),c.fundName),h("div",{class:"help"},(c.firm||"")+(c.fundSize?" · "+money(c.fundSize)+" fund":""))),ring(m.total,52));
+      info=[h("div",{class:"meta",style:"margin-top:0"},(c.stages||[]).map(x=>h("span",{class:"chip stage"},x)),(c.sectors||[]).map(x=>h("span",{class:"chip"},x)),c.leadFollow?h("span",null,c.leadFollow):null,c.geography?h("span",null,c.geography):null),
+        h("div",{class:"meta",style:"margin-top:0"},h("span",null,money(c.checkMin)+"–"+money(c.checkMax)+" checks"),c.partnerName?h("span",null,"Contact: "+c.partnerName):null,c.partnerEmail?h("span",{class:"copy"},h("code",null,c.partnerEmail)):null,link(c.partnerLinkedin,"LinkedIn"),c.relationship?h("span",null,c.relationship):null,c.coinvestFit?h("span",null,"Co-invest fit: "+c.coinvestFit):null)];
+    } else {
+      top=h("div",{class:"mtop"},h("div",null,h("div",{class:"t"},h("span",{class:"idx"},String(n+1)),c.name),h("div",{class:"help"},c.oneLiner||"")),ring(m.total,52));
+      info=[h("div",{class:"meta",style:"margin-top:0"},tagRow(c),h("span",{class:"chip stage"},dealStage(c)),c.sector?h("span",{class:"chip"},c.sector):null,c.stage?h("span",null,c.stage):null,c.geography?h("span",null,c.geography):null,c.raise?h("span",null,"Raising "+money(c.raise)):null,c.arr?h("span",null,"ARR "+money(c.arr)):null)];
+    }
+    const card=h("div",{class:"inv mcard"+(byDeal?"":" click")},top,h("div",{class:"mrow"},chips),info,h("div",{class:"help"},"Check fit: "+m.chkNote));
+    if(!byDeal){ card.setAttribute("role","button"); card.tabIndex=0; card.addEventListener("click",()=>openDeal(c.id)); card.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); openDeal(c.id); } }); }
+    list.append(card);
+  });
+}
+
+/* ---------- copilot ---------- */
+// Answers come from the scout-copilot edge function (supabase/functions/scout-copilot), which calls the
+// desk's AI model. The desk builds the context here from records this user can already read.
+const CP={hist:[],busy:false,ctl:null,mode:"ask",kind:"startup",ready:null};
+const CP_STOP=new Set("the and for with that this what which who whom how are our their from about tell show give list does did has have had was were been will can could should would into onto than then them they your you any all not but out one two more most some such only also very just get got let make find best top fit fits fund funds startup startups company companies investor investors there where when why".split(" "));
+const CP_PROMPTS=["Which funds best fit our top-scored startup?","What is stuck in Diligence or IC Review?","Which startups have verified revenue?","Which funds back MENA B2B AI at seed?"];
+
+const slug=s=>norm(s).replace(/[^a-z0-9]/g,"");
+function hostOf(u){ if(!u||typeof u!=="string") return ""; try{ const x=new URL(/^https?:\/\//i.test(u.trim())?u.trim():"https://"+u.trim()); return x.hostname.replace(/^www\./,"").toLowerCase(); }catch(e){ return ""; } }
+function mentions(nq,name){ const n=norm(name).trim(); if(n.length<3) return false; const esc=n.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"); return new RegExp("(^|[^a-z0-9])"+esc+"($|[^a-z0-9])").test(nq); }
+function toks(s){ return new Set(norm(s).split(/[^a-z0-9]+/).filter(Boolean)); }
+function hits(ts,set){ let n=0; for(const t of ts){ if(set.has(t)) n++; else if(t.length>=4){ for(const w of set){ if(w.startsWith(t)){ n++; break; } } } } return n; }
+function pick(o,ks){ const r={}; for(const k of ks){ let v=o[k]; if(v==null||v===""||(Array.isArray(v)&&!v.length)) continue; if(typeof v==="string"&&v.length>280) v=v.slice(0,280)+"…"; r[k]=v; } return r; }
+function inline(s){ const out=[]; const re=/\*\*([^*]+)\*\*/g; let p=0,m; while((m=re.exec(s))){ if(m.index>p) out.push(s.slice(p,m.index)); out.push(h("strong",null,m[1])); p=m.index+m[0].length; } if(p<s.length) out.push(s.slice(p)); return out; }
+function mdInto(el,text){
+  el.textContent="";
+  const li=/^\s*([-*•]|\d+[.)])\s+/;
+  for(const b of String(text).replace(/\r/g,"").split(/\n{2,}/)){
+    const lines=b.split("\n").filter(l=>l.trim()); if(!lines.length) continue;
+    if(lines.every(l=>li.test(l))) el.append(h("ul",{class:"cp-list"},lines.map(l=>h("li",null,inline(l.replace(li,""))))));
+    else el.append(h("p",null,inline(lines.join(" "))));
+  }
+}
+const CP_ERR={not_configured:"Copilot has no AI model set up yet. A Supabase admin adds one (see scout-desk/README.md).",not_member:"Only desk members can use Copilot.",rate_limited:"The AI model is busy or out of credit. Wait a minute and try again.",too_large:"That pulled in too much data. Name one startup or fund.",bad_json:"The draft did not come back in a usable form. Try again.",upstream:"The AI model did not answer. Try again.",offline:"You're offline. Copilot needs a connection."};
+async function cpCall(body,signal){
+  const D=window.ScoutData;
+  if(!navigator.onLine) throw {code:"offline"};
+  const { data } = await D.sb.auth.getSession(); const token=data.session&&data.session.access_token;
+  const cfg=window.SCOUT_DESK_CONFIG;
+  let r;
+  try{ r=await fetch(cfg.supabaseUrl+"/functions/v1/scout-copilot",{method:"POST",signal,headers:{"Content-Type":"application/json",Authorization:"Bearer "+token,apikey:cfg.supabaseKey},body:JSON.stringify(body)}); }
+  catch(e){ if(e&&e.name==="AbortError") throw {code:"cancelled"}; throw {code:"upstream"}; }
+  const out=await r.json().catch(()=>({error:"upstream"}));
+  if(!r.ok||out.error) throw {code:out.error||"upstream"};
+  return out;
+}
+
+function cpVisible(){
+  const ok=k=>{ const st=review(k).status; return st==="Approved"||(isPartner()&&st!=="Rejected"); };
+  return {deals:S.deals.filter(d=>ok("deal-"+d.id)),invs:S.investors.filter(i=>ok("inv-"+i.id)),vets:S.vettings.filter(v=>ok("vet-"+v.id))};
+}
+function cDeal(d){ const f=fit(d); return {kind:"startup",name:d.name,pipelineStage:dealStage(d),reviewStatus:review("deal-"+d.id).status,fitScore:f.total,founderScoreAvg:f.fa,...pick(d,["sector","stage","geography","hq","founded","teamSize","website","oneLiner","arr","growth","customers","revenueVerified","tractionNotes","raise","valuation","instrument","committed","coInvestors","founderName","source","sourceDetail","thesis"])}; }
+function cInv(i){ return {kind:"fund",reviewStatus:review("inv-"+i.id).status,...pick(i,["fundName","firm","fundSize","vintage","checkMin","checkMax","stages","sectors","geography","leadFollow","partnerName","partnerEmail","relationship","coinvestFit","notes"])}; }
+function topMatches(base,pool,byDeal){
+  return pool.map(c=>({c,m:byDeal?matchScore(base,c):matchScore(c,base)})).sort((a,b)=>b.m.total-a.m.total).slice(0,5)
+    .map(({c,m})=>({[byDeal?"fund":"startup"]:byDeal?c.fundName:c.name,...(byDeal?{firm:c.firm}:{}),score:m.total,parts:m.parts.map(p=>p[0]+" "+p[1]+"/"+p[2]).join(", "),check:m.chkNote}));
+}
+function cpContext(q){
+  const {deals,invs,vets}=cpVisible();
+  const nq=norm(q), ts=nq.split(/[^a-z0-9]+/).filter(t=>t.length>=2&&!CP_STOP.has(t));
+  const dR=deals.map(d=>({d,named:mentions(nq,d.name),s:hits(ts,toks([d.name,d.oneLiner,d.sector,d.stage,d.geography,d.hq,d.founderName,d.coInvestors,d.tractionNotes,d.thesis,d.sourceDetail,dealStage(d)].join(" ")))}));
+  const iR=invs.map(i=>({i,named:mentions(nq,i.fundName)||mentions(nq,i.firm),s:hits(ts,toks([i.fundName,i.firm,i.partnerName,(i.sectors||[]).join(" "),(i.stages||[]).join(" "),i.geography,i.notes,i.leadFollow].join(" ")))}));
+  const by=(a,b)=>(b.named-a.named)||(b.s-a.s);
+  let pd=dR.filter(x=>x.named||x.s>0).sort(by).slice(0,12), pi=iR.filter(x=>x.named||x.s>0).sort(by).slice(0,12);
+  if(!pd.length) pd=dR.slice().sort((a,b)=>fit(b.d).total-fit(a.d).total).slice(0,6);
+  if(!pi.length) pi=iR.slice(0,6);
+  const nd=dR.filter(x=>x.named).slice(0,2).map(x=>x.d), ni=iR.filter(x=>x.named).slice(0,2).map(x=>x.i);
+  const ids=new Set(nd.map(d=>d.id));
+  const stageCounts={}; for(const p of PIPE) stageCounts[p]=deals.filter(d=>dealStage(d)===p).length;
+  const digest={
+    fund:"Vanguard Frontier I: $1.5M target, $25K-$35K checks, 15-25 companies, B2B AI, Fintech, SaaS",
+    viewerRole:S.role,
+    counts:{startups:deals.length,funds:invs.length,vettings:vets.length},
+    pipelineByStage:stageCounts,
+    topByFitScore:deals.slice().sort((a,b)=>fit(b).total-fit(a).total).slice(0,5).map(d=>({name:d.name,fitScore:fit(d).total,stage:dealStage(d)})),
+    inDiligenceOrLater:deals.filter(d=>["Diligence","IC Review","Term Sheet","Invested"].includes(dealStage(d))).map(d=>({name:d.name,stage:dealStage(d)})),
+    startups:pd.map(x=>cDeal(x.d)),
+    funds:pi.map(x=>cInv(x.i)),
+    vettings:vets.filter(v=>ids.has(v.dealId)).slice(0,6).map(v=>({startup:dealName(v.dealId),reviewStatus:review("vet-"+v.id).status,...pick(v,["founderName","role","founderScore","recommendation","tractionVerified","priorFounder","greenFlags","redFlags","risks"])})),
+    activity:S.activity.filter(a=>ids.has(a.dealId)).sort((a,b)=>(b.date||"").localeCompare(a.date||"")).slice(0,6).map(a=>({startup:dealName(a.dealId),...pick(a,["date","type","summary","nextStep","due"])}))
+  };
+  if(isPartner()) digest.partnerNotes=nd.filter(d=>S.notes[d.id]).map(d=>({startup:d.name,internalNotes:String(S.notes[d.id].internalNotes||"").slice(0,500),dealTerms:String(S.notes[d.id].dealTerms||"").slice(0,500)}));
+  const matches=[...nd.map(d=>({forStartup:d.name,bestFunds:topMatches(d,invs,true)})),...ni.map(i=>({forFund:i.fundName,bestStartups:topMatches(i,deals.filter(d=>dealStage(d)!=="Passed"),false)}))];
+  return {digest,matches,counts:{startups:pd.length,funds:pi.length}};
+}
+
+function cpStatus(){
+  const el=$("cp-status"); el.textContent="";
+  const pill=(cls,t)=>h("span",{class:"cp-pill "+cls},h("i"),t);
+  const v=cpVisible();
+  el.append(pill("ok",v.deals.length+" startups · "+v.invs.length+" funds on the desk"));
+  el.append(CP.ready===false?pill("off","AI model not set up"):S.db?pill("ok","Copilot ready"):pill("warn","Connecting…"));
+}
+function cpPaint(){
+  cpStatus();
+  const can=!!S.db&&CP.ready!==false;
+  $("cp-send").disabled=!can||CP.busy; $("cp-a-go").disabled=!can||CP.busy||!canSubmit();
+  const th=$("cp-thread"); if(!th.children.length) th.append(h("div",{class:"cp-empty"},h("b",null,"Ask the desk."),"Answers come from the startups, funds, vettings and activity on this desk."));
+  const d=S.deals.find(x=>review("deal-"+x.id).status==="Approved");
+  $("cp-input").placeholder=d?"Which funds fit "+d.name+"?":"Which funds fit our best startup?";
+}
+function cpMode(m){
+  CP.mode=m;
+  document.querySelectorAll("[data-cp]").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.cp===m)));
+  $("cp-ask").hidden=m!=="ask"; $("cp-add").hidden=m!=="add";
+}
+function cpPickKind(k){
+  CP.kind=k;
+  document.querySelectorAll("[data-cpk]").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.cpk===k)));
+  $("cp-a-name").placeholder=k==="startup"?"Startup name":"Fund or firm name";
+  $("cp-a-out").textContent="";
+}
+function cpFail(e){ if(e&&e.code==="not_configured"){ CP.ready=false; cpPaint(); } return CP_ERR[e&&e.code]||"Something failed. Try again."; }
+
+async function cpAsk(text){
+  const q=String(text||"").trim(); if(!q||CP.busy||!S.db) return;
+  CP.busy=true; cpPaint();
+  const th=$("cp-thread"); th.querySelector(".cp-empty")?.remove();
+  th.append(h("div",{class:"cp-msg user"},h("div",{class:"cp-bubble"},q)));
+  const bubble=h("div",{class:"cp-bubble"},"Thinking…"), meta=h("div",{class:"cp-meta"});
+  th.append(h("div",{class:"cp-msg bot"},bubble,meta));
+  $("cp-input").value=""; $("cp-stop").hidden=false;
+  const ctl=new AbortController(); CP.ctl=ctl;
+  bubble.scrollIntoView({block:"nearest"});
+  try{
+    const ctx=cpContext(q);
+    const r=await cpCall({mode:"ask",question:q,history:CP.hist.slice(-8),desk:ctx.digest,matches:ctx.matches},ctl.signal);
+    CP.ready=true; mdInto(bubble,r.text);
+    CP.hist.push({role:"user",content:q},{role:"assistant",content:r.text}); CP.hist=CP.hist.slice(-12);
+    meta.textContent="Read "+ctx.counts.startups+" startups and "+ctx.counts.funds+" funds from the desk"+(r.truncated?" · Answer was cut short. Ask for less at a time.":"");
+  }catch(e){
+    bubble.textContent=e&&e.code==="cancelled"?"Stopped.":cpFail(e);
+  }finally{
+    CP.busy=false; CP.ctl=null; $("cp-stop").hidden=true; cpPaint(); bubble.scrollIntoView({block:"nearest"});
+  }
+}
+
+/* draft an entry */
+function findExisting(key,name,site){
+  const n=slug(name), host=hostOf(site);
+  if(key==="startup") return S.deals.find(d=>(n&&slug(d.name)===n)||(host&&hostOf(d.website)===host));
+  return S.investors.find(i=>n&&[i.fundName,i.firm].some(x=>slug(x)===n));
+}
+const NOIMPORT=new Set(["founderEmail","founderLinkedin","partnerEmail","partnerLinkedin","deckLink","sourcedByLabel"]);
+function draftFields(key){
+  // The form schema, so the model fills exactly the fields the Submit form has.
+  return fieldsOf(key).filter(fd=>!NOIMPORT.has(fd.id)&&!["dealId","ratings","check"].includes(fd.type)).map(fd=>({id:fd.id,label:fd.label,type:fd.type,options:fd.options}));
+}
+function cleanDraft(key,raw,name,site){
+  const out={}, f=(raw&&raw.fields&&typeof raw.fields==="object")?raw.fields:{};
+  for(const fd of fieldsOf(key)){
+    if(NOIMPORT.has(fd.id)||["dealId","ratings","check"].includes(fd.type)) continue;
+    let v=f[fd.id]; if(v==null||v==="") continue;
+    if(fd.type==="select"){ if(!fd.options.includes(v)) continue; }
+    else if(fd.type==="chips"){ if(!Array.isArray(v)) continue; v=v.filter(x=>fd.options.includes(x)); if(!v.length) continue; }
+    else if(fd.type==="number"||fd.type==="money"){ v=Number(v); if(!isFinite(v)||v<0) continue; }
+    else { v=String(v).trim().slice(0,1500); if(!v) continue; if(fd.type==="url"){ const u=safeUrl(v)||(/^[\w.-]+\.[a-z]{2,}(\/|$)/i.test(v)?"https://"+v:null); if(!u) continue; v=u; } }
+    out[fd.id]=v;
+  }
+  const tag="Copilot draft from scout notes, unverified.";
+  if(key==="startup"){
+    if(!out.name) out.name=name;
+    if(!out.website&&site) out.website=safeUrl(site)||"https://"+site.replace(/^\/+/,"");
+    out.source="Other"; out.sourceDetail=tag;
+  } else {
+    if(!out.firm) out.firm=name; if(!out.fundName) out.fundName=name;
+    if(!out.relationship) out.relationship="Cold";
+    out.source="Other"; out.notes=tag+(out.notes?" "+out.notes:"");
+  }
+  return out;
+}
+function fmtVal(fd,v){ if(fd.type==="money") return money(v); if(Array.isArray(v)) return v.join(", "); return String(v); }
+function showDraft(out,key,clean,raw){
+  out.textContent="";
+  const fds=fieldsOf(key).filter(fd=>clean[fd.id]!=null);
+  const missing=fieldsOf(key).filter(fd=>fd.req&&fd.id!=="sourcedByLabel"&&clean[fd.id]==null);
+  const warns=(Array.isArray(raw&&raw.warnings)?raw.warnings:[]).filter(w=>typeof w==="string"&&w.trim()).slice(0,5);
+  const card=h("div",{class:"cp-card"},
+    h("div",null,h("h3",null,"Draft: "+(clean.name||clean.fundName||"entry")),h("p",{class:"sub"},(raw&&typeof raw.summary==="string"&&raw.summary)||"Draft ready for review.")),
+    h("div",{class:"meta",style:"margin-top:0"},h("span",{class:"chip stage"},"From your notes"),h("span",{class:"chip"},fds.length+" fields filled")),
+    h("div",{class:"cp-draft"},fds.map(fd=>h("div",null,h("span",{class:"k"},fd.label||fd.id),h("span",{class:"v"},fmtVal(fd,clean[fd.id]))))),
+    warns.length?h("div",{class:"note"},h("b",null,"Check before you submit. "),warns.join(" ")):null,
+    missing.length?h("div",{class:"cp-gaps"},h("b",null,"Still needed: "),missing.map(fd=>fd.label).join(", "),". You fill these in the Submit form."):h("div",{class:"cp-gaps"},"All required fields have a value. Read each one before you submit."),
+    h("div",{class:"actions"},h("button",{class:"btn primary",type:"button",on:{click:()=>cpLoad(key,clean)}},"Load into Submit form"),h("button",{class:"btn",type:"button",on:{click:()=>{out.textContent="";}}},"Discard")));
+  out.append(card); card.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+function cpLoad(key,clean){
+  resetForm(key);
+  for(const fd of fieldsOf(key)) if(clean[fd.id]!=null) setField(key,fd,clean[fd.id]);
+  const sc=lsGet("scout"); if(SCOUTS.includes(sc)){ const s=$(key+"-sourcedByLabel"); if(s) s.value=sc; }
+  lsSet("draft:"+key,collect(key).vals);
+  pickForm(key); go("submit");
+  $("foot-"+key).textContent="Loaded from Copilot. Check every field, then submit for partner review. Fields marked * are required.";
+  toast("Draft loaded. Review it, then submit.");
+}
+async function cpDraft(force){
+  if(CP.busy||!S.db) return;
+  const key=CP.kind, name=$("cp-a-name").value.trim(), site=$("cp-a-site").value.trim(), known=$("cp-a-known").value.trim();
+  const out=$("cp-a-out"); out.textContent="";
+  if(!name){ toast("Enter a name first"); $("cp-a-name").focus(); return; }
+  const ex=force?null:findExisting(key,name,site);
+  if(ex){
+    out.append(h("div",{class:"note"},h("b",null,"Already on the desk. "),(ex.name||ex.fundName)+" is logged ("+review((key==="startup"?"deal-":"inv-")+ex.id).status.toLowerCase()+"). ",
+      h("span",{class:"actions",style:"margin-top:8px"},key==="startup"?h("button",{class:"btn small",type:"button",on:{click:()=>openDeal(ex.id)}},"Open it"):null,h("button",{class:"btn small",type:"button",on:{click:()=>cpDraft(true)}},"Draft anyway"))));
+    return;
+  }
+  CP.busy=true; cpPaint(); $("cp-a-stop").hidden=false;
+  out.append(h("div",{class:"cp-progress"},"Drafting the entry…"));
+  const ctl=new AbortController(); CP.ctl=ctl;
+  try{
+    const raw=await cpCall({mode:"draft",kind:key,name,site,known,fields:draftFields(key)},ctl.signal);
+    CP.ready=true;
+    showDraft(out,key,cleanDraft(key,raw,name,site),raw);
+  }catch(e){
+    out.textContent="";
+    if(e&&e.code==="cancelled") out.append(h("div",{class:"help"},"Stopped."));
+    else out.append(h("div",{class:"note"},h("b",null,"Draft failed. "),cpFail(e)));
+  }finally{
+    CP.busy=false; CP.ctl=null; $("cp-a-stop").hidden=true; cpPaint();
+  }
+}
+function cpInit(){
+  document.querySelectorAll("[data-cp]").forEach(b=>b.addEventListener("click",()=>cpMode(b.dataset.cp)));
+  document.querySelectorAll("[data-cpk]").forEach(b=>b.addEventListener("click",()=>cpPickKind(b.dataset.cpk)));
+  $("cp-send").addEventListener("click",()=>cpAsk($("cp-input").value));
+  $("cp-input").addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); cpAsk($("cp-input").value); } });
+  $("cp-stop").addEventListener("click",()=>CP.ctl&&CP.ctl.abort());
+  $("cp-a-stop").addEventListener("click",()=>CP.ctl&&CP.ctl.abort());
+  $("cp-clear").addEventListener("click",()=>{ if(CP.ctl) CP.ctl.abort(); CP.hist=[]; $("cp-thread").textContent=""; cpPaint(); });
+  $("cp-a-go").addEventListener("click",()=>cpDraft(false));
+  const pr=$("cp-prompts"); for(const p of CP_PROMPTS) pr.append(h("button",{class:"pill",type:"button",on:{click:()=>cpAsk(p)}},p));
+  cpPaint();
+}
+
 /* ---------- navigation ---------- */
 function go(tab){
   document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected",String(t.dataset.tab===tab)));
@@ -636,7 +913,7 @@ function go(tab){
   scLast=-1; updateCounter();
 }
 function pickForm(k){
-  document.querySelectorAll(".seg button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.form===k)));
+  document.querySelectorAll(".seg button[data-form]").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.form===k)));
   ["startup","investor","activity"].forEach(x=>$("form-"+x+"-wrap").hidden=x!==k);
 }
 function showVetForm(dealId){ const w=$("form-vetting-wrap"); w.hidden=false; if(dealId){ const s=$("vetting-dealId"); s.value=dealId; } w.scrollIntoView({behavior:"smooth",block:"start"}); }
@@ -656,7 +933,7 @@ let raf=0;
 function renderData(){
   cancelAnimationFrame(raf);
   raf=requestAnimationFrame(()=>{
-    renderPipeline(); renderInvestors(); renderVettings(); renderQueue(); refreshDealSelects();
+    renderPipeline(); renderInvestors(); renderVettings(); renderQueue(); renderMatch(); cpPaint(); refreshDealSelects();
     const c=isPartner()?pendingCount():(S.me?.id?queueItems().filter(q=>q.doc.submittedBy===S.me.id&&review(q.key).status==="Needs info").length:0);
     $("queue-count").textContent=c?String(c):"";
     if(S.sheet) renderSheet(false);
@@ -671,11 +948,13 @@ refreshDealSelects();
 for(const k of ["startup","investor","activity","vetting"]) restoreDraft(k);
 if(lsGet("draft:vetting")) $("form-vetting-wrap").hidden=false;
 document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>go(t.dataset.tab)));
-document.querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>pickForm(b.dataset.form)));
+document.querySelectorAll(".seg button[data-form]").forEach(b=>b.addEventListener("click",()=>pickForm(b.dataset.form)));
 $("new-vetting").addEventListener("click",()=>{ const w=$("form-vetting-wrap"); if(w.hidden) showVetForm(); else w.hidden=true; });
 $("inv-search").addEventListener("input",e=>{S.invQuery=e.target.value;renderInvestors();});
 wireSearch("deal-search","deal-search-clear","dealQuery",renderPipeline);
 wireSearch("vet-search","vet-search-clear","vetQuery",renderVettings);
+document.querySelectorAll("[data-mm]").forEach(b=>b.addEventListener("click",()=>{ S.mm=b.dataset.mm; renderMatch(); }));
+cpInit();
 document.addEventListener("keydown",e=>{
   if(e.key!=="/"||e.metaKey||e.ctrlKey||e.altKey) return;
   const t=e.target; if(t&&(t.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
@@ -687,7 +966,7 @@ document.addEventListener("keydown",e=>{
 $("sheet-close").addEventListener("click",closeSheet);
 $("sheet").addEventListener("click",e=>{ if(e.target.id==="sheet") closeSheet(); });
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!$("sheet").hidden) closeSheet(); });
-const hash=(location.hash||"").slice(1); if(["pipeline","submit","vetting","investors","queue","about"].includes(hash)) go(hash);
+const hash=(location.hash||"").slice(1); if(["pipeline","submit","vetting","investors","match","copilot","queue","about"].includes(hash)) go(hash);
 paintRole(); renderData();
 
 async function connect(){

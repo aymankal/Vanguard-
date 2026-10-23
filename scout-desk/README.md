@@ -4,6 +4,18 @@ The Vanguard Frontier deal desk as an installable app with the Vanguard V icon. 
 
 Data lives in **Supabase**, in the same project as Vanguard Docs but in its own tables (`scout_docs`, `scout_members`) with its own roles. Every permission is enforced in the database with row-level security, so the publishable key in `config.js` can't read anything on its own. Changes show up live for everyone.
 
+## Match and Copilot
+- **Match** ranks the 5 best-fit funds for a startup, or the 5 best-fit startups for a fund, out of 100: sector 30, stage 25, check size 20, geography 10, access 15. It runs in the app from desk data, no setup needed.
+- **Copilot** answers questions about the desk (Ask) and drafts new startup or investor entries from a scout's notes (Draft an entry). Drafts load into the Submit form; nothing is saved until a scout submits and a partner approves. It runs on the `scout-copilot` Supabase function, which uses the same AI model secrets as the Vanguard Docs copilot. Deploy it once:
+
+```bash
+supabase functions deploy scout-copilot
+# only if no model is set yet:
+supabase secrets set AI_BASE_URL=https://models.github.ai/inference AI_API_KEY=<github token> AI_MODEL=openai/gpt-4.1
+```
+
+Without a model the Copilot tab says "AI model not set up" and everything else keeps working.
+
 ## Roles
 - **Partner:** approves submissions, moves stages, keeps partner-only notes and deal terms, and manages the team (Queue → Team).
 - **Scout:** submits startups, investors, vettings and activity, and sees the approved pipeline.
