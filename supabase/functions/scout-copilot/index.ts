@@ -43,7 +43,10 @@ type Llm = { kind: "anthropic"; client: Anthropic; model: string } | { kind: "op
 function provider(): Llm | null {
   const ak0 = Deno.env.get("ANTHROPIC_API_KEY");
   if (ak0) return { kind: "anthropic", client: new Anthropic({ apiKey: ak0 }), model: Deno.env.get("ANTHROPIC_MODEL") || "claude-opus-5-5" };
-  const base = Deno.env.get("AI_BASE_URL"), key = Deno.env.get("AI_API_KEY"), model = Deno.env.get("AI_MODEL");
+  // With only AI_API_KEY set, assume a GitHub token and use GitHub Models.
+  const key = Deno.env.get("AI_API_KEY");
+  const base = Deno.env.get("AI_BASE_URL") || (key ? "https://models.github.ai/inference" : "");
+  const model = Deno.env.get("AI_MODEL") || (key ? "openai/gpt-4.1" : "");
   if (base && key && model) {
     return { kind: "openai", url: `${base.replace(/\/+$/, "")}/chat/completions`, headers: { Authorization: `Bearer ${key}` }, model, tokenParam: "max_tokens" };
   }
