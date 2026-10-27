@@ -15,22 +15,26 @@
 
   var now = Date.now();
   var events = (cfg.events || []).filter(function (e) {
-    var ok = e && /^evt-[A-Za-z0-9]+/.test(e.id || "") && isLuma(e.url) && !isNaN(Date.parse(e.date));
+    var ok = e && isLuma(e.url) && (!e.id || /^evt-[A-Za-z0-9]+/.test(e.id)) && (!e.date || !isNaN(Date.parse(e.date)));
     if (!ok) warn("Skipping event with a bad id, url or date: " + JSON.stringify(e));
     return ok;
   }).filter(function (e) {
-    // Keep an event listed until 6 hours after it starts.
-    return Date.parse(e.date) + 6 * 3600 * 1000 > now;
-  }).sort(function (a, b) { return Date.parse(a.date) - Date.parse(b.date); });
+    // Keep an event listed until 6 hours after it starts. Undated events always show.
+    return !e.date || Date.parse(e.date) + 6 * 3600 * 1000 > now;
+  }).sort(function (a, b) { return (a.date ? Date.parse(a.date) : Infinity) - (b.date ? Date.parse(b.date) : Infinity); });
 
   function fmt(e, opts) {
     try { return new Intl.DateTimeFormat("en-GB", Object.assign({ timeZone: e.tz || undefined }, opts)).format(new Date(e.date)); }
     catch (_) { return new Intl.DateTimeFormat("en-GB", opts).format(new Date(e.date)); }
   }
 
-  // Turns an <a> into a Luma checkout button. href stays as the fallback.
+  // Points an <a> at the Luma event. With an evt- id it also becomes Luma's checkout button;
+  // href stays as the fallback.
   function makeRegister(a, e) {
     a.href = e.url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    if (!e.id) return;
     a.className += " luma-checkout--button";
     a.setAttribute("data-luma-action", "checkout");
     a.setAttribute("data-luma-event-id", e.id);
@@ -48,8 +52,10 @@
   var heroNext = document.getElementById("hero-next");
   if (next) {
     makeRegister(heroBtn, next);
-    heroBtn.textContent = "Register for the next event";
-    heroNext.textContent = "Next: " + next.title + " · " + fmt(next, { weekday: "short", day: "numeric", month: "short" }) + " · " + next.city;
+    heroBtn.textContent = "Register on Luma";
+    heroNext.textContent = next.date
+      ? "Next: " + next.title + " · " + fmt(next, { weekday: "short", day: "numeric", month: "short" }) + (next.city ? " · " + next.city : "")
+      : "Date, time and venue on the Luma event page.";
     heroNext.hidden = false;
   } else if (calendarUrl) {
     heroBtn.href = calendarUrl;
@@ -68,20 +74,23 @@
     var when = document.createElement("div");
     when.className = "event-date";
     when.innerHTML = "<span class='m'></span><span class='d'></span>";
-    when.querySelector(".m").textContent = fmt(e, { month: "short" });
-    when.querySelector(".d").textContent = fmt(e, { day: "numeric" });
+    when.querySelector(".m").textContent = e.date ? fmt(e, { month: "short" }) : "Date";
+    when.querySelector(".d").textContent = e.date ? fmt(e, { day: "numeric" }) : "TBA";
+    if (!e.date) when.className += " tba";
     var body = document.createElement("div");
     body.className = "event-body";
     var h = document.createElement("h3");
     h.textContent = e.title;
     var meta = document.createElement("p");
     meta.className = "event-meta";
-    meta.textContent = fmt(e, { weekday: "long", hour: "2-digit", minute: "2-digit", timeZoneName: "short" }) + " · " + e.city + (e.venue ? " · " + e.venue : "");
+    meta.textContent = e.date
+      ? [fmt(e, { weekday: "long", hour: "2-digit", minute: "2-digit", timeZoneName: "short" }), e.city, e.venue].filter(Boolean).join(" · ")
+      : "Date, time and venue on the Luma event page.";
     body.appendChild(h);
     body.appendChild(meta);
     var a = document.createElement("a");
     a.className = "btn primary";
-    a.textContent = "Register";
+    a.textContent = "Register on Luma";
     makeRegister(a, e);
     li.appendChild(when);
     li.appendChild(body);
@@ -91,7 +100,7 @@
   empty.hidden = events.length > 0;
 
   // Buttons exist now; load Luma's script once. If it fails, the hrefs above still work.
-  if (events.length) {
+  if (events.some(function (e) { return e.id; })) {
     var s = document.createElement("script");
     s.id = "luma-checkout";
     s.src = LUMA_SCRIPT;

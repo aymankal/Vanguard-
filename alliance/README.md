@@ -50,6 +50,9 @@ Rules the page applies on its own:
 - Events are sorted by date. The earliest upcoming one becomes the hero **Register** button.
 - An event stays listed until 6 hours after its start, then hides. You don't need to delete old
   entries, but you can.
+- Only `url` is required. Without `id`, Register opens the Luma event page in a new tab instead
+  of Luma's registration window. Without `date`, the card says the details are on Luma.
+- Leave `calendarUrl` empty to hide the "Subscribe to the calendar" buttons.
 - An entry with a non-`evt-` id, a non-Luma URL or a bad date is skipped and logged in the
   browser console.
 - With no upcoming events, the hero button changes to "See upcoming events" (the calendar) and the
