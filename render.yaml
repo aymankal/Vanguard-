@@ -67,3 +67,23 @@ services:
       - path: /*
         name: X-Content-Type-Options
         value: nosniff
+  # Frontier Alliance landing page (alliance/). Registration happens on Luma; no backend, no forms.
+  # The CSP allows Luma's checkout script and its registration modal (an iframe on lu.ma / luma.com).
+  - type: web
+    name: vanguard-alliance
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: ./alliance
+    headers:
+      - path: /config.js
+        name: Cache-Control
+        value: no-cache
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self' https://embed.lu.ma https://embed.luma.com https://*.lu.ma https://*.luma.com; style-src 'self' 'unsafe-inline' https://*.lu.ma https://*.luma.com; img-src 'self' data: https:; font-src 'self' data: https://*.lu.ma https://*.luma.com; frame-src https://lu.ma https://*.lu.ma https://luma.com https://*.luma.com; connect-src 'self' https://*.lu.ma https://*.luma.com https://lu.ma https://luma.com; frame-ancestors 'none'; base-uri 'self'; form-action 'none'"
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
