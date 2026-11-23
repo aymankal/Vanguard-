@@ -1,0 +1,47 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "co.vanguardservices.deskai"
+    compileSdk 34
+
+    defaultConfig {
+        // Separate from the team app (co.vanguardservices.scoutdesk) so both can sit on one phone.
+        applicationId "co.vanguardservices.deskai"
+        minSdk 24
+        targetSdk 34
+        def buildNumber = (project.findProperty("versionCode") ?: "1").toString().toInteger()
+        versionCode buildNumber
+        versionName "1.0.${buildNumber}"
+    }
+
+    signingConfigs {
+        release {
+            def ks = System.getenv("SCOUT_DESK_KEYSTORE_PATH")
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv("SCOUT_DESK_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("SCOUT_DESK_KEY_ALIAS")
+                keyPassword System.getenv("SCOUT_DESK_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig System.getenv("SCOUT_DESK_KEYSTORE_PATH") ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation platform("org.jetbrains.kotlin:kotlin-bom:1.8.22")
+    implementation "androidx.browser:browser:1.8.0"
+}

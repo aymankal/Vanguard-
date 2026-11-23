@@ -1,0 +1,65 @@
+# Builds Scout Desk AI for Android (android-desk/): the Scout Desk Claude artifact as an app.
+# Stable download link, replaced on every build:
+#   https://github.com/aymankal/Vanguard-/releases/download/scout-desk-ai-android/ScoutDeskAI.apk
+name: Android Scout Desk AI
+on:
+  push:
+    paths: [android-desk/**, .github/workflows/android-desk.yml]
+  pull_request:
+    paths: [android-desk/**, .github/workflows/android-desk.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: android-desk-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: scout-desk-ai-debug-keystore
+      - name: Load signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SCOUT_DESK_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/scoutdesk.keystore"
+            echo "SCOUT_DESK_KEYSTORE_PATH=$RUNNER_TEMP/scoutdesk.keystore" >> "$GITHUB_ENV"
+          fi
+      - name: Build APK
+        working-directory: android-desk
+        env:
+          SCOUT_DESK_KEYSTORE_PASSWORD: ${{ secrets.SCOUT_DESK_KEYSTORE_PASSWORD }}
+          SCOUT_DESK_KEY_ALIAS: ${{ secrets.SCOUT_DESK_KEY_ALIAS }}
+          SCOUT_DESK_KEY_PASSWORD: ${{ secrets.SCOUT_DESK_KEY_PASSWORD }}
+        run: gradle assembleRelease -PversionCode=${{ github.run_number }} --no-daemon
+      - run: cp android-desk/app/build/outputs/apk/release/app-release.apk ScoutDeskAI.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ScoutDeskAI-${{ github.run_number }}
+          path: ScoutDeskAI.apk
+      - name: Publish release
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: scout-desk-ai-android
+          name: Scout Desk AI for Android
+          make_latest: false
+          overwrite_files: true
+          body: |
+            Latest build: #${{ github.run_number }} from ${{ github.ref_name }} (${{ github.sha }}).
+
+            Opens the Scout Desk Claude artifact full screen. Download ScoutDeskAI.apk on the phone, open it, allow installs from Chrome if asked.
+            Edits made in Claude reach the app on the next open; no reinstall needed.
+          files: ScoutDeskAI.apk
